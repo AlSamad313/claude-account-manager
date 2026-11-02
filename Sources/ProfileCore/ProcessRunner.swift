@@ -68,6 +68,11 @@ public struct ProcessRunner: ProcessRunning {
             }
             Thread.sleep(forTimeInterval: 0.02)
         }
+        if timedOut {
+            let grace = Date().addingTimeInterval(1)
+            while p.isRunning, Date() < grace { Thread.sleep(forTimeInterval: 0.02) }
+            if p.isRunning { kill(p.processIdentifier, SIGKILL) }
+        }
         p.waitUntilExit()
         // A child that keeps the pipes open must not hang the caller.
         _ = group.wait(timeout: .now() + 1)

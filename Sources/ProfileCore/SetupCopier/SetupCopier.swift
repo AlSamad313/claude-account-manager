@@ -37,7 +37,8 @@ public struct SetupCopier {
 
         var hashes: [String: String?] = [targetSettingsFile.path: sha256(of: targetSettingsFile)]
         for item in items where item.isFile {
-            for path in filePairs(item, source: source, target: target).map(\.dest.path) { hashes[path] = sha256(of: URL(fileURLWithPath: path)) }
+            // updateValue, because assigning nil through a subscript would forget that the file did not exist.
+            for path in filePairs(item, source: source, target: target).map(\.dest.path) { hashes.updateValue(sha256(of: URL(fileURLWithPath: path)), forKey: path) }
         }
         return CopyPlan(sourceId: source.id, targetId: target.id, items: items, blockedReason: blockedReason(target), beforeHashes: hashes)
     }
@@ -73,6 +74,8 @@ public struct SetupCopier {
             for (i, arg) in (server["args"] as? [String] ?? []).enumerated() where SecretDetector.looksSecret(arg) {
                 item.secrets.append(SecretField(name: "args[\(i)]", isArgument: true))
             }
+            // A URL cannot be dropped and still work, so it is treated like an argument.
+            if let url = server["url"] as? String, SecretDetector.looksSecret(url) { item.secrets.append(SecretField(name: "url", isArgument: true)) }
             let text = ([server["command"] as? String ?? ""] + (server["args"] as? [String] ?? [])).joined(separator: " ")
             item.pointsIntoSource = text.contains(sourceDir)
             let type = server["type"] as? String
@@ -91,7 +94,8 @@ public struct SetupCopier {
             let exists = (dst["permissions"] as? [String: Any])?[key] != nil
             var item = CopyItem(id: "perm:\(key)", kind: .permissions, key: "permissions.\(key)", action: new.isEmpty ? .same : (exists ? .change : .add))
             item.detail = new.isEmpty ? "No new rules." : new.map { "+ \($0)" }.joined(separator: ", ") + (exists ? ". Existing rules kept." : "")
-            item.ticked = !new.isEmpty
+            item.flaggedFile = new.contains(where: SecretDetector.looksSecret)
+            item.ticked = !new.isEmpty && !item.flaggedFile
             return item
         }
     }
@@ -149,7 +153,9 @@ public struct SetupCopier {
         let from = locator.configDir(for: source), to = locator.configDir(for: target)
         for (folder, kind) in [("skills", CopyKind.skill), ("agents", .agent), ("commands", .command)] {
             let dir = from.appendingPathComponent(folder)
-            let names = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).filter { !$0.hasPrefix(".") }.sorted()
+            // skills/synced comes from the account, through its own sync, and is never copied.
+            let names = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
+                .filter { !$0.hasPrefix(".") && !(folder == "skills" && $0 == "synced") }.sorted()
             for name in names {
                 items.append(fileItem(kind: kind, key: "\(folder)/\(name)", from: dir.appendingPathComponent(name), to: to.appendingPathComponent(folder).appendingPathComponent(name)))
             }
@@ -173,15 +179,20 @@ public struct SetupCopier {
     }
 
     /// Every file under a skill folder. A symbolic link is followed, so the target never depends on the source.
-    private static func expand(from: URL, to: URL) -> [FilePair] {
+    /// A link back to a parent folder is skipped, and so is anything that is not a plain file, such as a pipe.
+    private static func expand(from: URL, to: URL, parents: Set<String> = []) -> [FilePair] {
         let fm = FileManager.default
         let real = from.resolvingSymlinksInPath()
         var isDir: ObjCBool = false
         guard fm.fileExists(atPath: real.path, isDirectory: &isDir) else { return [] }
-        guard isDir.boolValue else { return [FilePair(source: real, dest: to)] }
+        guard isDir.boolValue else {
+            let type = (try? fm.attributesOfItem(atPath: real.path))?[.type] as? FileAttributeType
+            return type == .typeRegular ? [FilePair(source: real, dest: to)] : []
+        }
+        guard !parents.contains(real.path) else { return [] }
         var out: [FilePair] = []
         for name in ((try? fm.contentsOfDirectory(atPath: real.path)) ?? []).sorted() where name != ".DS_Store" {
-            out += expand(from: real.appendingPathComponent(name), to: to.appendingPathComponent(name))
+            out += expand(from: real.appendingPathComponent(name), to: to.appendingPathComponent(name), parents: parents.union([real.path]))
         }
         return out
     }
@@ -261,8 +272,6 @@ public struct SetupCopier {
             failed.append(CopyFailure(itemId: "files", reason: error.localizedDescription))
         }
 
-        for i in manifest.entries.indices { manifest.entries[i].after = sha256(of: URL(fileURLWithPath: manifest.entries[i].path)) }
-
         // Then Claude Code's own commands, which Restore cannot undo.
         var removals: [String] = []
         if failed.isEmpty {
@@ -280,6 +289,9 @@ public struct SetupCopier {
                 if let c = item.removalCommand { removals.append(c) }
             }
         }
+        // After the commands, because a plugin install rewrites settings.json, and Restore would
+        // otherwise take that for later work and leave the file alone.
+        for i in manifest.entries.indices { manifest.entries[i].after = sha256(of: URL(fileURLWithPath: manifest.entries[i].path)) }
         manifest.removalCommands = removals
         try backups.save(manifest, id: backupId)
         locator.logEvent(kind: "copy", profileId: target.id, detail: "\(done.count) items from \(source.id), \(failed.count) failed, backup \(backupId)")
@@ -319,12 +331,21 @@ public struct SetupCopier {
         }
         guard JSONSerialization.isValidJSONObject(s),
               let data = try? JSONSerialization.data(withJSONObject: s, options: [.sortedKeys]) else { return "Its entry could not be read." }
+        // Claude Code will not add over an existing name, and its old entry is in no backup.
+        let old = item.action == .change ? mcpServers(target)[item.key] : nil
         if item.action == .change {
             let r = cli.removeMCP(name: item.key, profile: target)
             if r.exitCode != 0 { return "Could not replace it: \(r.stderr)" }
         }
         let r = cli.addMCP(name: item.key, json: String(decoding: data, as: UTF8.self), profile: target)
-        return r.exitCode == 0 ? nil : (r.stderr.isEmpty ? r.stdout : r.stderr)
+        if r.exitCode == 0 { return nil }
+        let reason = r.stderr.isEmpty ? r.stdout : r.stderr
+        guard item.action == .change else { return reason }
+        if let old, let oldData = try? JSONSerialization.data(withJSONObject: old, options: [.sortedKeys]),
+           cli.addMCP(name: item.key, json: String(decoding: oldData, as: UTF8.self), profile: target).exitCode == 0 {
+            return "\(reason) Its old entry was put back."
+        }
+        return "\(reason) Its old entry was removed and could not be put back, so add it again in that profile."
     }
 
     private func installPlugin(_ item: CopyItem, sourceSettings: [String: Any], source: Profile, target: Profile) -> String? {

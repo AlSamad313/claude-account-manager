@@ -14,8 +14,10 @@ func usage() -> Never {
       cpm resume <sessionId>                          resume on the profile that owns it
       cpm stop <sessionId> [--yes]                    stop a running session
       cpm code <commandName> [folder]                 open VS Code on a profile
+      cpm remove <commandName> [--yes]                sign out a profile and move its folder to the Trash
       cpm doctor [--fix]                              check the setup
       cpm install-shell                               install the shell layer
+      cpm uninstall [--yes]                           remove all added profiles and the shell layer
     """)
     exit(1)
 }
@@ -39,13 +41,26 @@ func profile(_ name: String) throws -> Profile {
 
 func reconcile() throws {
     EventLog(locator: locator).rotate()
-    let r = try Reconciler(store: store, login: login).run()
+    let r = try Reconciler(store: store, login: login, remover: ProfileRemover(store: store)).run()
+    for n in r.removalsResumed { print("Finished removing \(n).") }
     for n in r.loginNotices + r.accountNotices { print(n) }
     for n in r.rowsWithoutFolder { print("\(n): its folder is missing. Run: cpm doctor") }
 }
 
 func shellQuote(_ s: String) -> String {
     "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+}
+
+/// Asks on a terminal. Without one, only --yes goes ahead.
+func confirmed(_ question: String, yes: Bool) -> Bool {
+    if yes { return true }
+    guard isatty(STDIN_FILENO) == 1 else { fail("Nothing changed. Without a terminal to confirm on, use --yes.") }
+    print("\(question) [y/N] ", terminator: "")
+    return ["y", "yes"].contains(readLine()?.lowercased() ?? "")
+}
+
+func printWarnings(_ r: RemovalResult) {
+    for w in r.warnings { print("Warning: \(w)") }
 }
 
 func tabSafe(_ s: String) -> String {
@@ -155,7 +170,7 @@ do {
         let reg = try store.load()
         let index = SessionIndex(locator: locator)
         guard let owner = index.ownerOf(sessionId: rest[0], in: reg.profiles) else { throw LauncherError.noOwner(rest[0]) }
-        guard let row = findRow(rest[0], owner: owner, index: index) else { throw LauncherError.noOwner(rest[0]) }
+        guard let row = findRow(rest[0], owner: owner, index: index) else { fail("That session belongs to the desktop app. Resume it there.") }
         try Launcher(store: store).resume(session: row, owner: owner)
         print("Opened Terminal on \(owner.commandName), resuming \(row.title).")
 
@@ -167,7 +182,7 @@ do {
         let reg = try store.load()
         let index = SessionIndex(locator: locator)
         guard let owner = index.ownerOf(sessionId: ids[0], in: reg.profiles),
-              let row = findRow(ids[0], owner: owner, index: index) else { throw LauncherError.noOwner(ids[0]) }
+              let row = findRow(ids[0], owner: owner, index: index) else { fail("That session is not running, or belongs to the desktop app.") }
         let result = SessionStopper(locator: locator).stop(row: row) { req in
             print("Stop \"\(req.title)\" on \(owner.displayName), in \(req.folder ?? "unknown folder"), \(req.status ?? "status unknown")?")
             if let w = req.warning { print(w) }
@@ -183,6 +198,39 @@ do {
         case .didNotStop(let pid): fail("It did not stop. Its process ID is \(pid).", code: 2)
         }
 
+    case "remove":
+        let yes = rest.contains("--yes")
+        let names = rest.filter { $0 != "--yes" }
+        guard names.count == 1, rest.count == names.count + (yes ? 1 : 0) else { usage() }
+        try reconcile()
+        let p = try profile(names[0])
+        guard !p.builtin else { throw ProfileError.notAllowed("The built-in profile cannot be removed.") }
+        print("This signs \(p.displayName) out, and moves its folder, history and backups to the Trash. Other profiles stay signed in.")
+        if try store.defaultProfile().id == p.id { print("It is the default, so the built-in profile becomes the default.") }
+        guard confirmed("Remove \(p.displayName)?", yes: yes) else {
+            print("Not removed.")
+            break
+        }
+        let result = try ProfileRemover(store: store).remove(profile: p)
+        printWarnings(result)
+        print("Removed \(p.displayName).")
+
+    case "uninstall":
+        let yes = rest == ["--yes"]
+        guard rest.isEmpty || yes else { usage() }
+        try reconcile()
+        let added = try store.load().profiles.filter { !$0.builtin }
+        print("This signs out \(added.count) added profile(s), and moves ~/.claude-profiles to the Trash, with their history and backups. ~/.claude and your current login are not touched. Quit the Claude Profiles app first, or it will recreate that folder.")
+        guard confirmed("Uninstall?", yes: yes) else {
+            print("Nothing changed.")
+            break
+        }
+        let result = try ProfileRemover(store: store).uninstall()
+        result.removed.forEach(printWarnings)
+        print("Uninstalled. Now remove these two lines yourself, then open a new Terminal window:\n")
+        print("~/.zshenv:\n  \(result.zshenvLine)\n")
+        print("~/.zshrc:\n  \(result.zshrcLine)")
+
     case "doctor":
         // Without --fix, doctor must see faults rather than repair them.
         if rest == ["--fix"] {
@@ -195,7 +243,8 @@ do {
 
     case "install-shell":
         guard rest.isEmpty else { usage() }
-        let me = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        // Not arguments[0], which is just "cpm" when it was found on PATH.
+        guard let me = Bundle.main.executableURL?.resolvingSymlinksInPath() else { fail("Cannot tell where cpm is running from.") }
         let result = try ShellInstaller(store: store).install(from: me.deletingLastPathComponent())
         print("Installed to \(locator.binDir.path).\n")
         print("Add one line to the end of each file, on a line of its own:\n")

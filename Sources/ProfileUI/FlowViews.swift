@@ -21,6 +21,7 @@ public struct FlowView: View {
             case .shell: ShellSetupView(model: model)
             case .stop(let id): StopConfirmation(model: model, sessionId: id)
             case .copy: CopySetupView(model: model)
+            case .remove(let id): RemoveProfileView(model: model, profileId: id)
             }
         }
         .padding(16)
@@ -196,12 +197,52 @@ struct ProfileSettingsView: View {
                 Text("Quit VS Code first if it is running. Opened from the Dock, it uses the built-in profile.")
                     .font(.system(size: 11.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack {
+                    if !p.builtin {
+                        Button("Remove…", role: .destructive) { model.errorText = nil; model.route = .remove(profileId: p.id) }
+                    }
                     Spacer()
                     Button("Done") {
                         if name != p.displayName { model.rename(profile: p, to: name) }
                         model.route = .main
                     }.keyboardShortcut(.defaultAction)
                 }
+            }
+        }
+    }
+}
+
+struct RemoveProfileView: View {
+    @Bindable var model: AppModel
+    let profileId: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let p = model.profile(id: profileId) {
+                FlowTitle(text: "Remove \(p.displayName)?")
+                if model.hasLiveSession(profileId: profileId) {
+                    Text("This profile has a live session. Stop it first; removal is refused while one is running.")
+                        .font(.system(size: 12)).padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                } else {
+                    Text("This signs \(p.displayName) out, and moves its folder, history and backups to the Trash. Other profiles stay signed in.")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if p.id == model.defaultProfileId {
+                    Text("It is the default, so the built-in profile becomes the default first.")
+                        .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                if let e = model.errorText {
+                    Text(e).font(.system(size: 12)).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                }
+                HStack {
+                    Spacer()
+                    Button("Cancel") { model.route = .settings(profileId: profileId) }
+                    Button("Remove profile", role: .destructive) { Task { await model.removeProfile(profileId: profileId) } }
+                        .disabled(model.removeBusy || model.hasLiveSession(profileId: profileId))
+                }
+            } else {
+                Text("That profile is gone.")
+                HStack { Spacer(); Button("Done") { model.route = .main } }
             }
         }
     }

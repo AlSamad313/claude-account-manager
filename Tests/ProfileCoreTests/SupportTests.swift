@@ -103,6 +103,41 @@ import Testing
         }
     }
 
+    /// An app opened from the Dock has no useful PATH, so the login shell's is what counts.
+    @Test func theAppReadsPATHFromALoginShell() throws {
+        let s = try Sandbox(); defer { s.cleanup() }
+        let real = s.home.appendingPathComponent("homebrew/claude")
+        try makeExec(real)
+        let runner = FakeRunner()
+        runner.handler = { _, _ in ProcessResult(stdout: "motd noise\nCPM_PATH_MARKER\n\(s.locator.binDir.path):\(real.deletingLastPathComponent().path)\n") }
+        let b = ClaudeBinaryLocator.fromLoginShell(locator: s.locator, runner: runner)
+        #expect(b.realBinary()?.path == real.path)
+        _ = b.realBinary()
+        #expect(runner.calls.count == 1, "read once, then kept")
+        let cli = ClaudeCLI(locator: s.locator, runner: runner, binary: b)
+        let p = try s.store.create(displayName: "A", commandName: "a", color: "#000000")
+        _ = cli.logout(profile: p)
+        #expect(runner.calls.last?.0 == real.path)
+        #expect(runner.calls.last?.2?.set["PATH"]?.contains("homebrew") == true, "its children need PATH too")
+    }
+
+    @Test func aFailedShellReadFallsBack() throws {
+        let s = try Sandbox(); defer { s.cleanup() }
+        let runner = FakeRunner()
+        runner.handler = { _, _ in ProcessResult(stdout: "", exitCode: 1, timedOut: true) }
+        #expect(LoginShell.path(runner: runner) == nil)
+        #expect(!ClaudeBinaryLocator.fromLoginShell(locator: s.locator, runner: runner).path.isEmpty)
+    }
+
+    /// Only with CPM_REAL_CLAUDE set: your real login shell, read-only.
+    @Test func realLoginShellFindsTheRealBinary() throws {
+        guard ProcessInfo.processInfo.environment["CPM_REAL_CLAUDE"] != nil else { return }
+        let s = try Sandbox(); defer { s.cleanup() }
+        let found = ClaudeBinaryLocator.fromLoginShell(locator: s.locator).realBinary()
+        #expect(found != nil && found?.lastPathComponent == "claude")
+        print("REAL BINARY", found?.path ?? "none")
+    }
+
     @Test func nilWhenNothingFound() throws {
         let s = try Sandbox(); defer { s.cleanup() }
         #expect(ClaudeBinaryLocator(locator: s.locator, path: "/nonexistent:\(s.home.path)").realBinary() == nil)
@@ -231,6 +266,14 @@ import Testing
         #expect(r.timedOut)
     }
 
+    /// A shell's startup files can trap SIGTERM, and the login shell read and doctor both run them.
+    @Test func aShellThatIgnoresTerminateStillEnds() {
+        let start = Date()
+        let r = ProcessRunner().run(executable: "/bin/zsh", args: ["-fc", "trap '' TERM; sleep 4; sleep 4; print done"], env: nil, timeout: 0.2)
+        #expect(r.timedOut)
+        #expect(Date().timeIntervalSince(start) < 5)
+    }
+
     @Test func missingExecutableIsReported() {
         #expect(ProcessRunner().run(executable: "/nonexistent", args: [], env: nil, timeout: 1).exitCode == 127)
     }
@@ -261,6 +304,19 @@ import Testing
         try s.store.setDefault(id: p.id)
         _ = try ShellInstaller(store: s.store).install(from: try source(s))
         #expect(try s.store.defaultProfile().id == p.id)
+    }
+
+    @Test func anUpgradeReplacesChangedScriptsAndNeverInstallsUninvited() throws {
+        let s = try Sandbox(); defer { s.cleanup() }
+        let i = ShellInstaller(store: s.store)
+        let src = try source(s)
+        #expect(try !i.updateIfInstalled(from: src), "not installed, so left alone")
+        #expect(!i.isInstalled())
+        _ = try i.install(from: src)
+        #expect(try !i.updateIfInstalled(from: src), "nothing changed")
+        try s.write("#!/bin/sh\n# new\n", to: "build/cli/claude-as")
+        #expect(try i.updateIfInstalled(from: src))
+        #expect(try String(contentsOf: s.locator.binDir.appendingPathComponent("claude-as"), encoding: .utf8).contains("new"))
     }
 
     @Test func aMissingFileIsAnError() throws {

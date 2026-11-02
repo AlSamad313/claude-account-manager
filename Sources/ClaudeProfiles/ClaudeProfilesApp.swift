@@ -11,7 +11,7 @@ struct ClaudeProfilesApp: App {
         let shell = Bundle.main.resourceURL?.appendingPathComponent("shell")
         let m = AppModel(env: .live(shellSource: shell))
         m.startWatching()
-        Task { await m.refresh() }
+        Task { await m.prepareAtLaunch() }
         _model = State(initialValue: m)
     }
 

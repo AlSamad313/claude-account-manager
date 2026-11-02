@@ -33,7 +33,7 @@ public struct ClaudeCLI {
 
     public func version() -> String? {
         guard let real = binary.realBinary() else { return nil }
-        let r = runner.run(executable: real.path, args: ["--version"], env: nil, timeout: 15)
+        let r = runner.run(executable: real.path, args: ["--version"], env: LaunchEnv(set: ["PATH": binary.path]), timeout: 15)
         guard r.exitCode == 0 else { return nil }
         return r.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -42,6 +42,8 @@ public struct ClaudeCLI {
         guard let real = binary.realBinary() else {
             return ProcessResult(stderr: "Cannot find the real claude binary on PATH.", exitCode: 127)
         }
-        return runner.run(executable: real.path, args: args, env: locator.environment(for: profile), timeout: timeout)
+        var env = locator.environment(for: profile)
+        env.set["PATH"] = binary.path  // plugin commands run git
+        return runner.run(executable: real.path, args: args, env: env, timeout: timeout)
     }
 }

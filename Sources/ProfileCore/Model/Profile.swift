@@ -59,7 +59,7 @@ public enum ProfileError: Error, Equatable, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .invalidCommandName(let n): return "'\(n)' is not a valid command name. Use 1 to 24 lowercase letters, digits or hyphens."
+        case .invalidCommandName(let n): return "'\(n)' is not a valid command name. Use 1 to 24 lowercase letters, digits or hyphens, starting with a letter or digit."
         case .invalidDisplayName(let n): return "'\(n)' is not a valid display name. Use 1 to 40 characters with no tabs, newlines or control characters."
         case .invalidColor(let c): return "'\(c)' is not a valid colour. Use #RRGGBB."
         case .commandNameTaken(let n): return "A profile already uses the command name '\(n)'."
@@ -71,7 +71,7 @@ public enum ProfileError: Error, Equatable, CustomStringConvertible {
 
 public enum Validate {
     public static func commandName(_ s: String) throws {
-        let ok = s.wholeMatch(of: #/[a-z0-9-]{1,24}/#) != nil && s != Profile.builtinID
+        let ok = s.wholeMatch(of: #/[a-z0-9][a-z0-9-]{0,23}/#) != nil && s != Profile.builtinID
         if !ok { throw ProfileError.invalidCommandName(s) }
     }
 

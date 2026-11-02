@@ -5,9 +5,10 @@ import SwiftUI
 import Testing
 @testable import ProfileUI
 
-private final class FakeKeychain: KeychainNames {
+private final class FakeKeychain: KeychainEditing {
     var names: Set<String> = ["Claude Code-credentials"]
     func listServiceNames() -> Set<String> { names }
+    func delete(service: String) throws { names.remove(service) }
 }
 
 private final class FakeOpener: TerminalOpener {
@@ -73,7 +74,10 @@ private final class Harness {
         model = AppModel(env: AppEnvironment(store: store, login: login, launcher: launcher,
                                              index: SessionIndex(locator: locator, processes: processes), stopper: stopper,
                                              doctor: Doctor(locator: locator, keychain: keychain, runner: runner), installer: installer,
-                                             copier: SetupCopier(store: store, cli: cli, live: LiveSessionReader(locator: locator, processes: processes)), shellSource: nil))
+                                             copier: SetupCopier(store: store, cli: cli, live: LiveSessionReader(locator: locator, processes: processes)),
+                                             remover: ProfileRemover(store: store, cli: cli, keychain: keychain, live: LiveSessionReader(locator: locator, processes: processes),
+                                                                     trash: { try FileManager.default.removeItem(at: $0) }),
+                                             shellSource: nil))
     }
 
     func builtinAccount(org: String = "Acme") throws {
@@ -129,6 +133,39 @@ private final class Harness {
         await h.model.restore(backupId: backup.id, targetId: a.id)
         #expect(!FileManager.default.fileExists(atPath: dest.path))
         #expect(h.model.restoreResult?.removed.count == 1)
+    }
+
+    @Test func removeProfileMovesTheDefaultAndClearsTheSelection() async throws {
+        let h = try Harness()
+        try h.builtinAccount()
+        let a = try h.store.create(displayName: "A", commandName: "a", color: "#000000")
+        try h.signIn(a, uuid: "u2", email: "a@example.com")
+        try h.store.completeLogin(id: a.id, account: Account(accountUuid: "u2", email: "a@example.com", organizationName: nil), keychainService: nil)
+        try h.store.setDefault(id: a.id)
+        await h.model.refresh()
+        h.model.sidebarSelection = a.id
+        h.model.route = .remove(profileId: a.id)
+        await h.model.removeProfile(profileId: a.id)
+        #expect(h.model.profile(id: a.id) == nil)
+        #expect(h.model.defaultProfileId == Profile.builtinID)
+        #expect(h.model.sidebarSelection == "all")
+        #expect(h.model.route == .main)
+        #expect(!FileManager.default.fileExists(atPath: a.configDir!))
+    }
+
+    @Test func removeIsRefusedDuringALiveSessionAndStaysPut() async throws {
+        let h = try Harness()
+        let a = try h.store.create(displayName: "A", commandName: "a", color: "#000000")
+        try h.signIn(a, uuid: "u2", email: "a@example.com")
+        try h.store.completeLogin(id: a.id, account: Account(accountUuid: "u2", email: "a@example.com", organizationName: nil), keychainService: nil)
+        try h.live(a, pid: 7, id: "running")
+        await h.model.refresh()
+        #expect(h.model.hasLiveSession(profileId: a.id))
+        h.model.route = .remove(profileId: a.id)
+        await h.model.removeProfile(profileId: a.id)
+        #expect(h.model.errorText?.contains("live session") == true)
+        #expect(h.model.route == .remove(profileId: a.id))
+        #expect(h.model.profile(id: a.id) != nil)
     }
 
     @Test func aBuiltinTargetIsAnErrorNotACrash() async throws {
@@ -206,21 +243,32 @@ private final class Harness {
     @Test func resumeUsesTheOwner() async throws {
         let h = try Harness()
         let a = try h.store.create(displayName: "A", commandName: "a", color: "#000000")
-        try h.transcript(a, id: "s1", title: "T", cwd: h.home.path)
+        try h.transcript(a, id: "11111111-2222-3333-4444-555555555555", title: "T", cwd: h.home.path)
         await h.model.refresh()
         h.model.resume(h.model.rows[0])
         await h.settle()
-        #expect(h.opener.texts.first?.contains("'a' '--resume' 's1'") == true)
+        #expect(h.opener.texts.first?.contains("'a' '--resume' '11111111-2222-3333-4444-555555555555'") == true)
+    }
+
+    /// With one added profile as From, To has nothing valid. It used to wait on a spinner forever.
+    @Test func copyTargetFollowsTheSource() async throws {
+        let h = try Harness()
+        let a = try h.store.create(displayName: "A", commandName: "a", color: "#000000")
+        let b = try h.store.create(displayName: "B", commandName: "b", color: "#000000")
+        #expect(copyTarget(source: Profile.builtinID, current: "", targets: [a]) == a.id)
+        #expect(copyTarget(source: a.id, current: a.id, targets: [a]) == "")
+        #expect(copyTarget(source: a.id, current: a.id, targets: [a, b]) == b.id)
+        #expect(copyTarget(source: Profile.builtinID, current: b.id, targets: [a, b]) == b.id)
     }
 
     @Test func aMissingFolderOffersChooseFolder() async throws {
         let h = try Harness()
         let b = try h.store.defaultProfile()
-        try h.transcript(b, id: "s1", title: "T", cwd: "/no/such/place")
+        try h.transcript(b, id: "11111111-2222-3333-4444-555555555555", title: "T", cwd: "/no/such/place")
         await h.model.refresh()
         h.model.resume(h.model.rows[0])
         await h.settle()
-        #expect(h.model.missingFolderRow?.sessionId == "s1")
+        #expect(h.model.missingFolderRow?.sessionId == "11111111-2222-3333-4444-555555555555")
         #expect(h.opener.texts.isEmpty)
         #expect(h.model.errorText == nil)
     }

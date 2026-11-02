@@ -6,16 +6,23 @@ public enum SecretDetector {
     public static let mask = "••••••"
 
     private static let patterns: [NSRegularExpression] = [
-        #"sk-[A-Za-z0-9_-]{20,}"#,
+        #"\bsk-[A-Za-z0-9_-]{20,}"#,
         #"ghp_[A-Za-z0-9]{20,}"#,
         #"xox[bap]-[A-Za-z0-9-]+"#,
         #"\b[0-9a-fA-F]{40,}\b"#,
-        #"\b[A-Za-z0-9+/]{40,}={0,2}(?![A-Za-z0-9+/=])"#,
     ].map { try! NSRegularExpression(pattern: $0) }
+
+    /// No slash, because long file paths would match. Needs upper, lower and a digit, because long words and names do not.
+    private static let base64 = try! NSRegularExpression(pattern: #"[A-Za-z0-9+]{40,}={0,2}"#)
 
     public static func looksSecret(_ s: String) -> Bool {
         let range = NSRange(s.startIndex..., in: s)
-        return patterns.contains { $0.firstMatch(in: s, range: range) != nil }
+        if patterns.contains(where: { $0.firstMatch(in: s, range: range) != nil }) { return true }
+        return base64.matches(in: s, range: range).contains { m in
+            guard let r = Range(m.range, in: s) else { return false }
+            let v = s[r]
+            return v.contains(where: \.isUppercase) && v.contains(where: \.isLowercase) && v.contains(where: \.isNumber)
+        }
     }
 
     /// For a file of free text: a match flags the whole file, with no masking inside it.

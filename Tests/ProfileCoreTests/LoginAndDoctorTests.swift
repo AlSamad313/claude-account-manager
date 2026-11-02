@@ -166,6 +166,21 @@ import Testing
         #expect(try !String(contentsOf: s.locator.namesFile, encoding: .utf8).contains("a\t\(p.id)"))
     }
 
+    @Test func aRowRecoversWhenItsFolderComesBack() throws {
+        let s = try Sandbox(); defer { s.cleanup() }
+        let p = try s.store.create(displayName: "A", commandName: "a", color: "#000000")
+        let dir = try #require(p.configDir)
+        try FileManager.default.removeItem(atPath: dir)
+        _ = try reconciler(s).run()
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        _ = try reconciler(s).run()
+        let back = try #require(try s.store.load().profile(id: p.id))
+        #expect(back.state == .loggedOut && back.lastError == nil)
+        try s.signIn(p, uuid: "u9")
+        _ = try reconciler(s).run()
+        #expect(try s.store.load().profile(id: p.id)?.state == .ready)
+    }
+
     @Test func aDetectedLoginIsReportedAndNeverCompleted() throws {
         let s = try Sandbox(); defer { s.cleanup() }
         let p = try s.store.create(displayName: "A", commandName: "a", color: "#000000")

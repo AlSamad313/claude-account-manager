@@ -126,8 +126,10 @@ final class FakeOpener: TerminalOpener {
         return l
     }
 
-    private func row(id: String = "abc", cwd: String?, live: Bool = false) -> SessionRow {
-        SessionRow(profileId: "x", sessionId: id, cwd: cwd, title: "T", lastActivity: Date(), live: live, status: nil,
+    private let goodId = "11111111-2222-3333-4444-555555555555"
+
+    private func row(id: String? = nil, cwd: String?, live: Bool = false) -> SessionRow {
+        SessionRow(profileId: "x", sessionId: id ?? goodId, cwd: cwd, title: "T", lastActivity: Date(), live: live, status: nil,
                    entrypoint: "cli", pid: live ? 4 : nil, procStart: nil, mayBeStale: false)
     }
 
@@ -172,7 +174,16 @@ final class FakeOpener: TerminalOpener {
         let a = try s.store.create(displayName: "A", commandName: "a", color: "#000000")
         try launcher(s, o).resume(session: row(cwd: s.home.path), owner: a)
         #expect(o.texts[0].contains("dir='\(s.home.path)'"))
-        #expect(o.texts[0].contains("'a' '--resume' 'abc'"))
+        #expect(o.texts[0].contains("'a' '--resume' '\(goodId)'"))
+    }
+
+    @Test func resumeRefusesAnIDThatIsNotAUUID() throws {
+        let s = try Sandbox(); defer { s.cleanup() }
+        let o = FakeOpener()
+        var r = row(cwd: s.home.path)
+        r.sessionId = "--dangerously-skip-permissions"
+        #expect(throws: ProfileError.self) { try launcher(s, o).resume(session: r, owner: try s.store.defaultProfile()) }
+        #expect(o.opened.isEmpty)
     }
 
     @Test func resumeRefusesALiveRow() throws {

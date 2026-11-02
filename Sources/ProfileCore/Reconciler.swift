@@ -5,22 +5,26 @@ public struct ReconcileResult: Equatable, Sendable {
     public var rowsWithoutFolder: [String] = []
     public var loginNotices: [String] = []
     public var accountNotices: [String] = []
+    public var removalsResumed: [String] = []
 }
 
-/// Runs when the app or cpm starts. Dependencies run one way: Reconciler uses LoginCoordinator
-/// and ProfileStore; ProfileStore uses neither. It never completes a login.
+/// Runs when the app or cpm starts. Dependencies run one way: Reconciler uses LoginCoordinator,
+/// ProfileRemover and ProfileStore; ProfileStore uses none of them. It never completes a login.
 public struct Reconciler {
     public let store: ProfileStore
     public let login: LoginCoordinator
+    public let remover: ProfileRemover?
 
-    public init(store: ProfileStore, login: LoginCoordinator) {
+    public init(store: ProfileStore, login: LoginCoordinator, remover: ProfileRemover? = nil) {
         self.store = store
         self.login = login
+        self.remover = remover
     }
 
     public func run() throws -> ReconcileResult {
         var result = ReconcileResult()
         try store.repairFiles()
+        if let remover { result.removalsResumed = try remover.resumePending().map(\.displayName) }
         let registry = try store.load()
         let locator = store.locator
         let fm = FileManager.default
@@ -47,6 +51,10 @@ public struct Reconciler {
                 try store.markLoggedOut(id: p.id)
             case (.loggedOut, .some(let a)):
                 try store.markReady(id: p.id, account: a)
+            case (.error, .some(let a)):  // its folder came back
+                try store.markReady(id: p.id, account: a)
+            case (.error, .none):
+                try store.markLoggedOut(id: p.id)
             case (.ready, .some(let a)):
                 if case .changed(let from, let to) = try store.updateAccount(id: p.id, account: a) {
                     result.accountNotices.append("\(p.displayName) changed account, from \(from ?? "unknown") to \(to ?? "unknown").")

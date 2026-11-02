@@ -38,6 +38,22 @@ public struct ShellInstaller {
         return InstallResult(zshenvLine: Self.zshenvLine, zshrcLine: Self.zshrcLine)
     }
 
+    /// Keeps the installed scripts in step with the app after an upgrade. Does nothing if the
+    /// shell layer was never installed, because that is the user's choice to make.
+    @discardableResult
+    public func updateIfInstalled(from source: URL) throws -> Bool {
+        guard isInstalled() else { return false }
+        let differs = Self.files.contains { name in
+            let from = source.appendingPathComponent(name)
+            let to = locator.binDir.appendingPathComponent(name)
+            guard let a = try? Data(contentsOf: from) else { return false }
+            return (try? Data(contentsOf: to)) != a
+        }
+        guard differs else { return false }
+        _ = try install(from: source)
+        return true
+    }
+
     public func isInstalled() -> Bool {
         let fm = FileManager.default
         return Self.files.allSatisfy { fm.fileExists(atPath: locator.binDir.appendingPathComponent($0).path) }

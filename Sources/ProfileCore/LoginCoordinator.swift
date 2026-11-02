@@ -84,6 +84,9 @@ public struct LoginCoordinator {
 
     /// Also signs out, so no Keychain item is left behind.
     public func discard(profile: Profile) throws {
+        if LiveSessionReader(locator: store.locator).hasLiveSession(profile) {
+            throw ProfileError.notAllowed("\(profile.displayName) has a live session. Stop it first.")
+        }
         if AccountReader.readAccount(configFile: store.locator.configFile(for: profile)) != nil {
             let r = cli.logout(profile: profile)
             guard r.exitCode == 0 else { throw ProfileError.failed("Could not sign out: \(r.stderr)") }

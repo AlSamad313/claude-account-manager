@@ -1,6 +1,13 @@
 import ProfileCore
 import SwiftUI
 
+/// Which profile the "To" menu should hold once "From" changes: the current one if it is still
+/// valid, otherwise the first valid one, or nothing if there is none. The built-in is never a target.
+func copyTarget(source: String, current: String, targets: [Profile]) -> String {
+    let valid = targets.filter { $0.id != source }.map(\.id)
+    return valid.contains(current) ? current : (valid.first ?? "")
+}
+
 /// Design flow 6. Nothing is written until Apply, and everything shown is what Apply will do.
 struct CopySetupView: View {
     @Bindable var model: AppModel
@@ -9,6 +16,7 @@ struct CopySetupView: View {
 
     private var sources: [Profile] { model.profiles.filter { $0.state == .ready } }
     private var targets: [Profile] { model.profiles.filter { !$0.builtin && $0.state == .ready } }
+    private var validTargets: [Profile] { targets.filter { $0.id != sourceId } }
 
     private static let groups: [(String, [CopyKind])] = [
         ("MCP SERVERS", [.mcpServer]),
@@ -27,14 +35,17 @@ struct CopySetupView: View {
             } else {
                 HStack {
                     Picker("From", selection: $sourceId) { ForEach(sources) { Text($0.displayName).tag($0.id) } }
-                    Picker("To", selection: $targetId) { ForEach(targets.filter { $0.id != sourceId }) { Text($0.displayName).tag($0.id) } }
+                    Picker("To", selection: $targetId) {
+                        if validTargets.isEmpty { Text("None").tag("") }
+                        ForEach(validTargets) { Text($0.displayName).tag($0.id) }
+                    }
                 }
                 .font(.system(size: 12))
                 if let reason = model.copyPlan?.blockedReason { note(reason, tint: .red) }
                 if let e = model.errorText { note(e, tint: .red) }
                 results
                 list
-                Text("Not copyable: claude.ai connectors and account-synced plugins belong to the account. Connect them at claude.ai while signed in as \(model.profile(id: targetId)?.email ?? "that account").")
+                Text("Not copyable: claude.ai connectors and account-synced plugins belong to the account. Connect them at claude.ai while signed in as \(model.profile(id: targetId)?.email ?? "the target account").")
                     .font(.system(size: 11.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Menu("Restore…") {
@@ -55,7 +66,10 @@ struct CopySetupView: View {
             }
         }
         .onAppear(perform: chooseDefaults)
-        .onChange(of: sourceId) { reload() }
+        .onChange(of: sourceId) {
+            let next = copyTarget(source: sourceId, current: targetId, targets: targets)
+            if next == targetId { reload() } else { targetId = next }
+        }
         .onChange(of: targetId) { reload() }
     }
 
@@ -67,7 +81,7 @@ struct CopySetupView: View {
 
     private func chooseDefaults() {
         sourceId = model.profile(id: Profile.builtinID)?.state == .ready ? Profile.builtinID : (sources.first?.id ?? "")
-        targetId = targets.first { $0.id != sourceId }?.id ?? ""
+        targetId = copyTarget(source: sourceId, current: "", targets: targets)
         reload()
     }
 
@@ -117,6 +131,9 @@ struct CopySetupView: View {
                             ForEach(items) { CopyItemRow(model: model, item: $0) }
                         }
                     }
+                } else if validTargets.isEmpty {
+                    Text("There is nothing to copy \(model.profile(id: sourceId)?.displayName ?? "this profile") into, because the built-in profile can only be copied from. Add another profile, or choose a different profile in From.")
+                        .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 } else {
                     ProgressView().controlSize(.small)
                 }
@@ -146,7 +163,7 @@ private struct CopyItemRow: View {
 
     private var warnings: [String] {
         var w: [String] = []
-        if !item.secrets.isEmpty { w.append("Contains a secret (API key). Unticked by default. Copying puts the key in plain text in \(target).") }
+        if !item.secrets.isEmpty { w.append("May contain a secret. Unticked by default. Copying puts any ticked value in plain text in \(target).") }
         if item.flaggedFile { w.append("This looks like it contains a secret. Unticked by default. Check it before copying.") }
         if item.pointsIntoSource { w.append("It points into the source profile's folder, so it would keep depending on that folder.") }
         if item.needsReLogin { w.append("Uses OAuth sign-in. You will need to sign in again in \(target).") }

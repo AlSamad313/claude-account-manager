@@ -22,6 +22,10 @@ output=$($e $cli/cpm install-shell 2>&1); has "install prints the zshrc line" "$
 [[ ! -e $home/.zshrc && ! -e $home/.zshenv ]] && ok || fail "install leaves shell files alone"
 cpm=$r/bin/cpm
 
+# Run by name from PATH, in another folder, as you would after installing.
+output=$(cd /tmp && $e cpm install-shell 2>&1); code=$?
+(( code == 0 )) && ok || fail "cpm install-shell works by name, got $code" "$output"
+
 output=$($e claude --x 2>&1)
 has "built-in works straight after install" "$output" "CLAUDE_CONFIG_DIR=<unset>"
 
@@ -121,11 +125,25 @@ has "stop falls back to SIGTERM" "$output" "Stopped with SIGTERM"
 sleep 0.2; kill -0 $lp 2>/dev/null && { fail "the process ended"; kill $lp } || ok
 wait $lp 2>/dev/null
 output=$($e $cpm stop $lid --yes 2>&1)
-has "a stopped session with no transcript is gone" "$output" "No profile holds"
+has "a stopped session with no transcript is gone" "$output" "not running"
 
 output=$($e $cpm resume 99999999-2222-3333-4444-555555555555 2>&1); code=$?
 (( code == 1 )) && ok || fail "resume of an unknown ID exits 1, got $code" "$output"
 has "and says so clearly" "$output" "No profile holds"
+
+# S5: refusals only here, because a real removal uses the real Trash. Swift tests cover the rest.
+output=$($e $cpm remove main --yes 2>&1); code=$?
+(( code == 1 )) && ok || fail "the built-in profile cannot be removed, got $code" "$output"
+has "and says so" "$output" "built-in profile cannot be removed"
+output=$($e $cpm remove nosuch --yes 2>&1); code=$?
+(( code == 1 )) && ok || fail "an unknown name exits 1, got $code" "$output"
+output=$($e $cpm remove personal </dev/null 2>&1); code=$?
+(( code == 1 )) && ok || fail "remove with no terminal and no --yes exits 1, got $code" "$output"
+has "and changes nothing" "$output" "Nothing changed"
+has "the profile is still there" "$(<$r/names)" "personal"
+output=$($e $cpm uninstall </dev/null 2>&1); code=$?
+(( code == 1 )) && ok || fail "uninstall with no terminal and no --yes exits 1, got $code" "$output"
+[[ -d $r ]] && ok || fail "uninstall changed nothing"
 
 # A generated .command file, run for real against the stub, using the installed wrapper.
 script=$(mktemp /private/tmp/cpm-cmd-XXXXXX)

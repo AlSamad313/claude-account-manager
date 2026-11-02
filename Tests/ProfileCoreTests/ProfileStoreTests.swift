@@ -51,7 +51,7 @@ import Testing
 
     @Test func hostileNamesAreRefused() throws {
         let s = try Sandbox(); defer { s.cleanup() }
-        for bad in ["a b", "A", "", "builtin", "$(x)", "a/b", String(repeating: "a", count: 25)] {
+        for bad in ["a b", "A", "", "builtin", "$(x)", "a/b", "--help", "-x", String(repeating: "a", count: 25)] {
             #expect(throws: ProfileError.self) { try s.store.create(displayName: "X", commandName: bad, color: "#000000") }
         }
         for bad in ["", "a\tb", "a\nb", "a\u{1B}]0;x", String(repeating: "a", count: 41)] {

@@ -13,11 +13,12 @@ public struct AppEnvironment {
     public var doctor: Doctor
     public var installer: ShellInstaller
     public var copier: SetupCopier
+    public var remover: ProfileRemover
     /// Where the shell files are bundled. Nil outside an app bundle.
     public var shellSource: URL?
 
     public init(store: ProfileStore, login: LoginCoordinator, launcher: Launcher, index: SessionIndex, stopper: SessionStopper,
-                doctor: Doctor, installer: ShellInstaller, copier: SetupCopier, shellSource: URL?) {
+                doctor: Doctor, installer: ShellInstaller, copier: SetupCopier, remover: ProfileRemover, shellSource: URL?) {
         self.store = store
         self.login = login
         self.launcher = launcher
@@ -26,14 +27,17 @@ public struct AppEnvironment {
         self.doctor = doctor
         self.installer = installer
         self.copier = copier
+        self.remover = remover
         self.shellSource = shellSource
     }
 
     public static func live(locator: ConfigLocator = .current(), shellSource: URL?) -> AppEnvironment {
         let store = ProfileStore(locator: locator)
-        return AppEnvironment(store: store, login: LoginCoordinator(store: store), launcher: Launcher(store: store),
+        // An app opened from the Dock does not get the shell's PATH, and needs it to find claude.
+        let cli = ClaudeCLI(locator: locator, binary: .fromLoginShell(locator: locator))
+        return AppEnvironment(store: store, login: LoginCoordinator(store: store, cli: cli), launcher: Launcher(store: store),
                               index: SessionIndex(locator: locator), stopper: SessionStopper(locator: locator),
-                              doctor: Doctor(locator: locator), installer: ShellInstaller(store: store), copier: SetupCopier(store: store), shellSource: shellSource)
+                              doctor: Doctor(locator: locator), installer: ShellInstaller(store: store), copier: SetupCopier(store: store, cli: cli), remover: ProfileRemover(store: store, cli: cli), shellSource: shellSource)
     }
 }
 
@@ -46,6 +50,7 @@ public enum Route: Equatable, Sendable {
     case shell
     case stop(sessionId: String)
     case copy
+    case remove(profileId: String)
 }
 
 /// Shared by the menu-bar panel and the window. It keeps only filtering and sorting; every
@@ -77,6 +82,7 @@ public final class AppModel {
     public private(set) var restoreResult: RestoreResult?
     public private(set) var copyBusy = false
     public private(set) var backups: [BackupInfo] = []
+    public private(set) var removeBusy = false
 
     private let env: AppEnvironment
     private let queue = DispatchQueue(label: "local.claude-profiles.model")
@@ -136,11 +142,21 @@ public final class AppModel {
         }
     }
 
+    /// Once, when the app starts.
+    public func prepareAtLaunch() async {
+        let env = env
+        _ = await onQueue {
+            EventLog(locator: env.store.locator).rotate()
+            if let source = env.shellSource { try env.installer.updateIfInstalled(from: source) }
+        }
+        await refresh()
+    }
+
     /// Full load: reconcile, profiles, sessions.
     public func refresh() async {
         let env = env
         let result = await onQueue { () -> Snapshot in
-            let reconcile = try Reconciler(store: env.store, login: env.login).run()
+            let reconcile = try Reconciler(store: env.store, login: env.login, remover: env.remover).run()
             let reg = try env.store.load()
             let sessions = env.index.sessions(for: reg.profiles)
             return Snapshot(profiles: reg.profiles, defaultId: reg.defaultProfileId, rows: sessions.rows, failures: sessions.parseFailures,
@@ -370,6 +386,28 @@ public final class AppModel {
         case .failure(let e):
             errorText = Self.message(e)
         }
+    }
+
+    // MARK: Removing
+
+    public func hasLiveSession(profileId: String) -> Bool { liveCount(profileId: profileId) > 0 }
+
+    public func removeProfile(profileId: String) async {
+        guard let p = profile(id: profileId) else { return }
+        removeBusy = true
+        defer { removeBusy = false }
+        let env = env
+        let result = await onQueue { try env.remover.remove(profile: p) }
+        switch result {
+        case .success(let r):
+            noticeText = r.warnings.first
+            errorText = nil
+            route = .main
+            if sidebarSelection == profileId { sidebarSelection = "all" }
+        case .failure(let e):
+            errorText = Self.message(e)
+        }
+        await refresh()
     }
 
     // MARK: Doctor and shell

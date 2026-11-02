@@ -12,7 +12,11 @@ import Testing
 
     @Test func ordinaryTextIsNotASecret() {
         for s in ["author", "monkey", "auth token key password", "a skill about tokens", "sk-short", "--verbose",
-                  "/usr/local/bin/node", "@scope/some-package", "https://example.com/mcp"] {
+                  "/usr/local/bin/node", "@scope/some-package", "https://example.com/mcp",
+                  "/Users/someone/Documents/Projects/a/very/long/path/that/goes/on/and/on/here",
+                  "thisisalongwordwithnodigitsoruppercaselettersinitatallreally",
+                  "task-abcdefghijklmnopqrstuvwxyz", "disk-usage-analyzer-plugin-for-claude",
+                  String(repeating: "a", count: 39) ] {
             #expect(!SecretDetector.looksSecret(s), "\(s)")
         }
     }
@@ -55,9 +59,15 @@ import Testing
 private final class FakeClaude: ProcessRunning {
     var calls: [[String]] = []
     var failOn: String?
+    var failOnlyOnce = false
+    var onRun: (([String]) -> Void)?
     func run(executable: String, args: [String], env: LaunchEnv?, timeout: TimeInterval) -> ProcessResult {
         calls.append(args)
-        if let f = failOn, args.joined(separator: " ").contains(f) { return ProcessResult(stderr: "boom", exitCode: 1) }
+        onRun?(args)
+        if let f = failOn, args.joined(separator: " ").contains(f) {
+            if failOnlyOnce { failOn = nil }
+            return ProcessResult(stderr: "boom", exitCode: 1)
+        }
         return ProcessResult()
     }
 }
@@ -119,6 +129,79 @@ private let startDate = LiveSessionReader.parseProcStart("Sat Oct 31 10:58:34 20
         var p = try w.plan()
         p.targetId = w.source.id
         #expect(throws: ProfileError.self) { try w.copier.apply(p) }
+    }
+
+    /// Its old entry is in no backup, so a failed add must not lose it.
+    @Test func aFailedMCPChangePutsTheOldEntryBack() throws {
+        let w = try World(); defer { w.s.cleanup() }
+        try w.sourceConfig(#"{"srv":{"command":"new"}}"#)
+        try w.targetFile(".claude.json", #"{"oauthAccount":{"accountUuid":"u2"},"mcpServers":{"srv":{"command":"old"}}}"#)
+        var p = try w.plan()
+        #expect(w.item(p, "mcp:srv")?.action == .change)
+        setTick(&p, "mcp:srv")
+        w.claude.failOn = "add-json"
+        w.claude.failOnlyOnce = true
+        let r = try w.copier.apply(p)
+        #expect(r.failed.first?.reason.contains("old entry was put back") == true)
+        let adds = w.claude.calls.filter { $0.contains("add-json") }
+        #expect(adds.count == 2 && adds[1].joined().contains("old"))
+    }
+
+    @Test func aPluginInstallDoesNotBlockRestoringSettings() throws {
+        let w = try World(); defer { w.s.cleanup() }
+        try w.sourceSettings(#"{"model":"m","enabledPlugins":{"tool@market":true}}"#)
+        var p = try w.plan()
+        setTick(&p, "model")
+        setTick(&p, "plugin:tool@market")
+        let settings = w.dstDir.appendingPathComponent("settings.json")
+        w.claude.onRun = { args in
+            if args.starts(with: ["plugin", "install"]) { try? Data(#"{"model":"m","enabledPlugins":{"tool@market":true}}"#.utf8).write(to: settings) }
+        }
+        let r = try w.copier.apply(p)
+        #expect(r.failed.isEmpty)
+        let restored = try w.copier.restore(profile: w.target, backupId: try #require(r.backupId))
+        #expect(restored.leftAlone.isEmpty)
+        #expect(w.targetText("settings.json")?.contains("\"model\"") != true)
+    }
+
+    @Test func aLinkLoopOrAPipeInASkillDoesNotHangThePreview() throws {
+        let w = try World(); defer { w.s.cleanup() }
+        try w.sourceFile("skills/loop/SKILL.md", "hi")
+        let dir = w.srcDir.appendingPathComponent("skills/loop")
+        try FileManager.default.createSymbolicLink(atPath: dir.appendingPathComponent("self").path, withDestinationPath: dir.path)
+        #expect(mkfifo(dir.appendingPathComponent("pipe").path, 0o600) == 0)
+        var p = try w.plan()
+        setTick(&p, "file:skills/loop")
+        #expect(try w.copier.apply(p).failed.isEmpty)
+        let copied = try FileManager.default.contentsOfDirectory(atPath: w.dstDir.appendingPathComponent("skills/loop").path)
+        #expect(copied == ["SKILL.md"])
+    }
+
+    @Test func accountSyncedSkillsAreNeverOffered() throws {
+        let w = try World(); defer { w.s.cleanup() }
+        try w.sourceFile("skills/synced/abc/SKILL.md", "from the account")
+        try w.sourceFile("skills/mine/SKILL.md", "mine")
+        let p = try w.plan()
+        #expect(w.item(p, "file:skills/synced") == nil)
+        #expect(w.item(p, "file:skills/mine") != nil)
+    }
+
+    @Test func aFileCreatedSinceThePreviewStopsTheCopy() throws {
+        let w = try World(); defer { w.s.cleanup() }
+        try w.sourceFile("CLAUDE.md", "new")
+        let p = try w.plan()
+        try w.targetFile("CLAUDE.md", "written after the preview")
+        #expect(throws: ProfileError.self) { try w.copier.apply(p) }
+        #expect(w.targetText("CLAUDE.md") == "written after the preview")
+    }
+
+    @Test func aSecretInAURLOrPermissionIsCaught() throws {
+        let w = try World(); defer { w.s.cleanup() }
+        try w.sourceConfig(#"{"srv":{"type":"http","url":"https://x.example/mcp?key=sk-abcdefghijklmnopqrstuvwx"}}"#)
+        try w.sourceSettings(#"{"permissions":{"allow":["Bash(curl -H 'x: sk-abcdefghijklmnopqrstuvwx')"]}}"#)
+        let p = try w.plan()
+        #expect(w.item(p, "mcp:srv")?.ticked == false && w.item(p, "mcp:srv")?.secrets.first?.name == "url")
+        #expect(w.item(p, "perm:allow")?.ticked == false && w.item(p, "perm:allow")?.flaggedFile == true)
     }
 
     @Test func defaultsMatchTheTable() throws {
@@ -362,6 +445,28 @@ private let startDate = LiveSessionReader.parseProcStart("Sat Oct 31 10:58:34 20
             try store.save(b.manifest, id: b.id)
         }
         #expect(store.list(profileId: w.target.id).count == BackupStore.keep)
+    }
+}
+
+/// Only runs with CPM_REAL_SETUP set: a preview of the real ~/.claude, read-only, into a throwaway
+/// target. Prints names, never values.
+@Suite struct RealSetupPreview {
+    @Test func preview() throws {
+        guard let real = ProcessInfo.processInfo.environment["CPM_REAL_SETUP"] else { return }
+        let s = try Sandbox(); defer { s.cleanup() }
+        try FileManager.default.createSymbolicLink(at: s.home.appendingPathComponent(".claude"), withDestinationURL: URL(fileURLWithPath: real + "/.claude"))
+        try FileManager.default.createSymbolicLink(at: s.home.appendingPathComponent(".claude.json"), withDestinationURL: URL(fileURLWithPath: real + "/.claude.json"))
+        let source = try s.store.defaultProfile()
+        var t = try s.store.create(displayName: "T", commandName: "t", color: "#000000")
+        try s.signIn(t, uuid: "u2")
+        try s.store.completeLogin(id: t.id, account: Account(accountUuid: "u2", email: nil, organizationName: nil), keychainService: nil)
+        t = try s.store.load().profile(id: t.id)!
+        let started = Date()
+        let p = try SetupCopier(store: s.store).plan(source: source, target: t)
+        print("PREVIEW took", round(Date().timeIntervalSince(started) * 100) / 100, "s, blocked:", p.blockedReason ?? "no")
+        for i in p.items {
+            print("PREVIEW", i.kind.rawValue, i.action.rawValue, i.ticked ? "ticked" : "off", i.flaggedFile ? "FLAGGED" : "", i.pointsIntoSource ? "POINTS-INTO-SOURCE" : "", i.needsReLogin ? "relogin" : "", i.secrets.isEmpty ? "" : "secrets:\(i.secrets.count)", i.key)
+        }
     }
 }
 

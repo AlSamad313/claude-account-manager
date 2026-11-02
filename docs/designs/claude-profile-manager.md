@@ -577,6 +577,7 @@ Where the default applies:
 | A session already running | No, by design |
 | A process that sets `CLAUDE_CONFIG_DIR` to a folder outside `~/.claude-profiles/` | No; its value wins, with a warning |
 | A `claude` call from inside a running session | No, by design; it stays on that session's profile |
+| A `claude` call from inside a session the wrapper did not start, such as the desktop app's | Yes; it has no profile to stay on, so it uses the default |
 
 #### Flow 6: Copying setup
 
@@ -629,7 +630,7 @@ may also write caches and registries the plan does not list. Rules:
 *   These can never be ticked in v1: login credentials and tokens stored by Claude
     Code, `apiKeyHelper`, `statusLine`, trust grants (`hasTrustDialogAccepted`, `allowedTools`),
     `oauthAccount`, `projects/`, `sessions/`, caches, plugin registries, and
-    `plugins/synced/`.
+    `plugins/synced/`, `skills/synced/`.
 *   Plugins (second step of copy setup): copy only the `enabledPlugins` and
     `extraKnownMarketplaces` entries, then install with Claude Code's own
     plugin commands under the target's environment (S0 check 8).
@@ -1668,7 +1669,7 @@ Run in two steps, as in the stage table.
 ##### 65. `Sources/ProfileCore/ProfileRemover.swift` (Create)
 
 *   **Type / Scope**: Owns flow 7 and uninstall.
-*   **Proposed Changes**: `remove(profile) throws`: refuses on `hasLiveSession`, then the flow 7
+*   **Proposed Changes**: Direct Keychain deletion is a fallback, because S0 check 6 showed logout removes the item. `remove(profile) throws`: refuses on `hasLiveSession`, then the flow 7
     order, each step safe to repeat, skipping Keychain deletion if no name was recorded.
     `resumePending()` continues any `deleting` row and is called by Reconciler.
     `uninstall() throws`: refuses if any added profile has a live session; removes each added
@@ -1710,3 +1711,21 @@ Run in two steps, as in the stage table.
 <!-- Provenance: Indicates initial structural drafting via EGM. -->
 
 *Drafted with EGM*
+
+## Rules settled by the pre-test audit
+
+These fill gaps the plan left open, and the code and tests follow them.
+
+- The app reads `PATH` from a login shell the first time it needs `claude`, keeps it, and passes it to the commands it runs. An app opened
+  from the Dock does not get the shell's `PATH`.
+- A timed-out command gets SIGTERM, then SIGKILL after 1 second.
+- Copy setup never offers `skills/synced`. It skips links back to a parent folder, and anything that is not a plain file.
+- A secret in an MCP `url` is treated like one in `args`: the server cannot be copied without it. A permission rule that looks secret starts
+  unticked.
+- Changing an MCP server removes the old entry and adds the new one. If the add fails, the old entry is put back, and the error says if that
+  also failed.
+- Restore's after-state is recorded after Claude Code's own commands, because a plugin install rewrites `settings.json`.
+- `error` means a profile's folder is missing. When the folder returns, the row becomes `ready` or `loggedOut` by whether it is signed in.
+- Resume refuses a session ID that is not a UUID. A command name cannot start with a hyphen.
+- At startup the app rotates the log and, only if the shell layer is installed, replaces any scripts that differ from its own.
+

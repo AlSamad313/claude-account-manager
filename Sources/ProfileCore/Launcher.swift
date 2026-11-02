@@ -59,6 +59,8 @@ public struct Launcher {
 
     public func resume(session: SessionRow, owner: Profile, folderOverride: URL? = nil) throws {
         guard !session.live else { throw LauncherError.sessionIsLive(pid: session.pid) }
+        // It comes from a file name or a record. Anything else would skip the wrapper's ownership check.
+        guard UUID(uuidString: session.sessionId) != nil else { throw ProfileError.notAllowed("That session ID is not valid.") }
         let folder = folderOverride ?? session.cwd.map { URL(fileURLWithPath: $0) } ?? locator.home
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDir), isDir.boolValue else {

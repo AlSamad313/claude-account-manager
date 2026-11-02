@@ -6,8 +6,8 @@ Each account is a profile with its own Claude Code config folder.
 The design is in [docs/designs/claude-profile-manager.md](docs/designs/claude-profile-manager.md).
 Checks against real Claude Code behaviour are in [docs/S0-results.md](docs/S0-results.md).
 
-Stages S1 to S4 are built: profiles, shell commands, `cpm`, the menu-bar app with its window, and copy setup. Profile
-removal (S5) is not.
+Stages S1 to S5 are built: profiles, shell commands, `cpm`, the menu-bar app with its window, copy setup, and profile
+removal. None of it has had hands-on use yet; [docs/E2E-checklist.md](docs/E2E-checklist.md) lists what to try.
 
 ## Requirements
 
@@ -96,9 +96,21 @@ warning, because Claude Code reports it instead of the profile's login.
 
 If `default` or `names` is damaged, plain `claude` stops rather than risk the wrong account.
 
+## Removing a profile
+
+Settings… > Remove in the app, or `cpm remove work`. It signs that profile out, and moves its folder, history and backups to
+the Trash. Other profiles stay signed in. It refuses while the profile has a live session, including a desktop app one. If it was
+the default, the built-in profile becomes the default first. The built-in profile cannot be removed. If removal is
+interrupted, it finishes the next time the app or `cpm` starts.
+
 ## Turning it off
 
-Delete the two added lines and open a new shell. `claude` then runs Claude Code directly on `~/.claude`.
+To stop using it but keep your profiles: delete the two added lines and open a new shell. `claude` then runs Claude Code directly
+on `~/.claude`.
+
+To remove everything: `cpm uninstall`. It refuses if any added profile has a live session. It removes every added
+profile, moves `~/.claude-profiles` to the Trash, and prints the two lines for you to delete. Delete the app from
+`~/Applications` yourself, and quit it before uninstalling, or it recreates the folder. `~/.claude`, `~/.claude.json` and your current login are not touched.
 
 ## When Claude Code updates
 

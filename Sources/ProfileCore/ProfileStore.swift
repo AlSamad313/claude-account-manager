@@ -100,7 +100,7 @@ public final class ProfileStore {
         if FileManager.default.fileExists(atPath: dir.path) { try trash(dir) }
     }
 
-    public func markLoggedOut(id: String) throws { try update(id) { $0.state = .loggedOut } }
+    public func markLoggedOut(id: String) throws { try update(id) { $0.state = .loggedOut; $0.lastError = nil } }
 
     public func markReady(id: String, account: Account) throws {
         try update(id) { Self.apply(account, to: &$0); $0.state = .ready; $0.lastError = nil }
