@@ -180,7 +180,8 @@ This is the step most likely to feel broken, so watch it closely.
   bash -lc 'claude auth status'
   ```
 
-  **Expect:** Official, Official, then **Personal**. `bash -l` is a documented exception.
+  **Expect:** Official, Official, then `claude: command not found`. On this Mac a `bash -l` shell has no Homebrew on its `PATH`, so it finds no `claude`
+  at all. It is a documented exception, and never runs the wrong account.
 - [ ] **5.4 A running session doesn't move.** In window A, type `! claude auth status`. **Expect:** Personal. Then `/exit`.
 - [ ] **5.5 New session follows.** In window A:
 
