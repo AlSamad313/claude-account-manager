@@ -30,7 +30,7 @@ different moments. Keychain names at that time: `Claude Code-credentials` only.
 | 11 | **Done, one pass of searching** | Details below |
 | 12 | **Done: login-wide setting removed** | Benefit passed, safety failed. Details below. Replaced by a per-app VS Code launch at the author's request |
 | 13 | **Done for `auth status`** | Details below. Effect on real requests not tested |
-| 14 | S1 | |
+| 14 | **Pass, with one exception** | Details below. Tested on copies of the author's shell files under a temporary HOME, not yet in a real install |
 | 15 | **Pass** | Details below |
 | 16 | Partly | Details below. Cowork value still unknown |
 | 17 | **Pass** | A harmless variable set with `launchctl setenv` reached a new Terminal.app instance started afterwards. Variable removed |
@@ -120,6 +120,16 @@ Dummy values on the built-in profile, reading `claude auth status --json`:
 | `CLAUDE_CODE_OAUTH_TOKEN` | `oauth_token` | No |
 
 So each one replaces the profile's login as far as status reports, and the warning can say so plainly.
+
+## Check 14
+
+With the two lines added to copies of the real `~/.zshenv`, `~/.zprofile` and `~/.zshrc`: a login shell, an interactive
+shell, `zsh -c`, `bash -c` and `sh` scripts started from a login shell all reach the wrapper. **`bash -l` does not:** it
+reruns `path_helper` and finds `/opt/homebrew/bin/claude`, so it uses the built-in profile. The real binary is found
+correctly from each.
+
+`~/.zshenv` does not end with a newline, so a plain `>>` would join the new line to the last `export PATH` line and break
+both. `cpm install-shell` therefore prints commands that add a newline first.
 
 ## Check 15
 

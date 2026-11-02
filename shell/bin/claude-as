@@ -1,0 +1,4 @@
+#!/bin/zsh
+# Runs Claude Code on a named profile. See claude-core.zsh.
+source "${0:A:h}/claude-core.zsh"
+main_claude_as "$@"

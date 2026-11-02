@@ -568,7 +568,7 @@ Where the default applies:
 | --- | --- |
 | zsh, new or already open, with the two shell lines added | Yes, through the wrapper, on the next `claude` |
 | bash or a script started from those shells | Yes, through the wrapper on `PATH` |
-| `bash -l`, after macOS `path_helper` reorders `PATH` | Depends on S0 check 14 |
+| `bash -l`, after macOS `path_helper` reorders `PATH` | No; uses the built-in profile (S0 check 14) |
 | A shell alias for `claude` | No, if the alias calls a full path; the alias wins |
 | Calling the full path to `claude` | No; uses the built-in profile |
 | cron jobs and launchd jobs | No; use the built-in profile |
@@ -1295,10 +1295,10 @@ Run `git init`, then:
     `Finding(level, profileId?, message, fix?)` per check; environment checks run in a
     login shell through ProcessRunner. `--fix` runs reconcile.
 
-##### 23. `shell/bin/claude`, `shell/bin/claude-as`, `shell/bin/claude-profiles.zsh` (Create)
+##### 23. `shell/bin/claude`, `shell/bin/claude-as`, `shell/bin/claude-core.zsh`, `shell/bin/claude-profiles.zsh` (Create)
 
 *   **Type / Scope**: zsh scripts on `PATH`; a zsh file sourced from `~/.zshrc`.
-*   **Proposed Changes**: `claude` and `claude-as` implement flow 1. They read `names`
+*   **Proposed Changes**: `claude` and `claude-as` implement flow 1, sharing `claude-core.zsh`. They read `names`
     with zsh field splitting on tabs, and no `jq`. `claude-profiles.zsh` puts the bin
     folder first on `PATH` again and registers completion for `claude-as` from `names`.
 
@@ -1328,7 +1328,7 @@ Run `git init`, then:
 
 *   **Type / Scope**: Build scripts.
 *   **Proposed Changes**: `swift build -c release --product cpm`; signs `cpm` with
-    `SIGN_IDENTITY`, failing with instructions if unset; copies `cpm` and `shell/bin/*`
+    `SIGN_IDENTITY`, or ad hoc if unset; copies `cpm` and `shell/bin/*`
     to `build/cli/`, from which `cpm install-shell` installs them.
     `scripts/test.sh` runs `swift test` with the Command Line Tools paths: `-F` for
     `Library/Developer/Frameworks`, `-plugin-path` for `usr/lib/swift/host/plugins/testing`,
@@ -1337,7 +1337,7 @@ Run `git init`, then:
 ##### 30. `Tests/ProfileCoreTests/Fixtures/` (Create)
 
 *   **Type / Scope**: Test data.
-*   **Proposed Changes**: Built from the key names S0 check 23 records. Fake config folders:
+*   **Proposed Changes**: Written by the tests themselves in `TestGuard.swift` and each suite, rather than stored as files. Built from the key names S0 check 23 records. Fake config folders:
     `builtin-home/.claude.json` and
     `added/<id>/.claude.json` with fake `oauthAccount` values and no tokens;
     `sessions/*.json` plus a decoy `.key` file, including `claude-desktop` records;

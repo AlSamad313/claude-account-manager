@@ -1,0 +1,9 @@
+#!/bin/zsh
+# Stub for the real binary. Prints what the wrapper handed it.
+print -r -- "ARGS=$*"
+print -r -- "CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR-<unset>}"
+print -r -- "CLAUDE_PROFILE_ID=${CLAUDE_PROFILE_ID-<unset>}"
+print -r -- "TITLE_OFF=${CLAUDE_CODE_DISABLE_TERMINAL_TITLE-<unset>}"
+print -r -- "API_KEY=${ANTHROPIC_API_KEY-<unset>}"
+print -r -- "AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-<unset>}"
+print -r -- "OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN-<unset>}"
