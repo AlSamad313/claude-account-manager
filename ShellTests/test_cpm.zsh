@@ -78,6 +78,68 @@ output=$($e $cpm add 'Bad' 'bad name' '#000000' 2>&1); code=$?
 output=$($e $cpm nonsense 2>&1); code=$?
 (( code == 1 )) && ok || fail "unknown subcommand exits 1, got $code" "$output"
 
+# S2: sessions
+sid=11111111-2222-3333-4444-555555555555
+mkdir -p $dir/projects/p
+print -r -- '{"type":"user","cwd":"'$home'","entrypoint":"cli","sessionId":"'$sid'"}' > $dir/projects/p/$sid.jsonl
+print -r -- '{"type":"ai-title","aiTitle":"Fix the thing","sessionId":"'$sid'"}' >> $dir/projects/p/$sid.jsonl
+output=$($e $cpm list 2>&1)
+has "list shows the session" "$output" "Fix the thing"
+has "list tags the profile" "$output" "personal"
+output=$($e $cpm list --profile main 2>&1)
+hasnt "list filters by profile" "$output" "Fix the thing"
+output=$($e $cpm list --live 2>&1)
+hasnt "list --live hides stopped sessions" "$output" "Fix the thing"
+output=$($e $cpm list --profile nosuch 2>&1); code=$?
+(( code == 1 )) && ok || fail "list of an unknown profile exits 1, got $code" "$output"
+
+# A real live process, recorded the way Claude Code records it. Its start time comes from ps,
+# converted to UTC, as procStart is.
+/bin/sleep 60 &
+lp=$!
+utc=$(/usr/bin/python3 -I -c "
+import subprocess, datetime as d
+s = subprocess.run(['ps','-o','lstart=','-p','$lp'],capture_output=True,text=True).stdout.strip()
+t = d.datetime.strptime(' '.join(s.split()),'%a %b %d %H:%M:%S %Y').astimezone(d.timezone.utc)
+print(t.strftime('%a %b %d %H:%M:%S %Y'))")
+lid=22222222-2222-3333-4444-555555555555
+mkdir -p $dir/sessions
+print -r -- '{"pid":'$lp',"sessionId":"'$lid'","procStart":"'$utc'","cwd":"'$home'","status":"busy","entrypoint":"cli","name":"Live one"}' > $dir/sessions/$lp.json
+output=$($e $cpm list --live 2>&1)
+has "a live process is listed as running" "$output" "running busy"
+has "with its title" "$output" "Live one"
+output=$($e $cpm stop $lid </dev/null 2>&1); code=$?
+(( code == 1 )) && ok || fail "stop with no terminal and no --yes exits 1, got $code" "$output"
+kill -0 $lp 2>/dev/null && ok || fail "and leaves the process running"
+output=$($e $cpm resume $lid 2>&1); code=$?
+(( code == 1 )) && ok || fail "resume of a live session exits 1, got $code" "$output"
+has "and says it is running" "$output" "already running"
+output=$($e $cpm stop $lid --yes 2>&1); code=$?
+has "stop warns about a busy session" "$output" "unfinished"
+# A background job started from a script ignores SIGINT, so this also exercises the SIGTERM step.
+has "stop falls back to SIGTERM" "$output" "Stopped with SIGTERM"
+sleep 0.2; kill -0 $lp 2>/dev/null && { fail "the process ended"; kill $lp } || ok
+wait $lp 2>/dev/null
+output=$($e $cpm stop $lid --yes 2>&1)
+has "a stopped session with no transcript is gone" "$output" "No profile holds"
+
+output=$($e $cpm resume 99999999-2222-3333-4444-555555555555 2>&1); code=$?
+(( code == 1 )) && ok || fail "resume of an unknown ID exits 1, got $code" "$output"
+has "and says so clearly" "$output" "No profile holds"
+
+# A generated .command file, run for real against the stub, using the installed wrapper.
+script=$(mktemp /private/tmp/cpm-cmd-XXXXXX)
+cat > $script <<CMD
+#!/bin/zsh
+dir='$home'
+cd -- "\$dir" || { print -ru2 -- "Folder not found: \$dir"; exit 1 }
+exec "\$HOME/.claude-profiles/bin/claude-as" 'personal' '--resume' '$sid'
+CMD
+output=$($e zsh $script 2>&1)
+has "a .command file reaches the wrapper on the right profile" "$output" "CLAUDE_CONFIG_DIR=$dir"
+has "with the resume arguments" "$output" "ARGS=--resume $sid"
+rm -f $script
+
 rm -rf $home
 print -r -- "$passes passed, $fails failed"
 (( fails == 0 ))

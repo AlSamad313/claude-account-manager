@@ -14,6 +14,23 @@ public struct ClaudeCLI {
 
     public func logout(profile: Profile) -> ProcessResult { run(["auth", "logout"], profile: profile, timeout: 30) }
 
+    /// User scope, so it lands in the profile's top-level mcpServers (S0 check 8).
+    public func addMCP(name: String, json: String, profile: Profile) -> ProcessResult {
+        run(["mcp", "add-json", name, json, "--scope", "user"], profile: profile, timeout: 60)
+    }
+
+    public func removeMCP(name: String, profile: Profile) -> ProcessResult {
+        run(["mcp", "remove", name, "--scope", "user"], profile: profile, timeout: 60)
+    }
+
+    public func addMarketplace(source: String, profile: Profile) -> ProcessResult {
+        run(["plugin", "marketplace", "add", source], profile: profile, timeout: 180)
+    }
+
+    public func installPlugin(name: String, profile: Profile) -> ProcessResult {
+        run(["plugin", "install", name], profile: profile, timeout: 180)
+    }
+
     public func version() -> String? {
         guard let real = binary.realBinary() else { return nil }
         let r = runner.run(executable: real.path, args: ["--version"], env: nil, timeout: 15)

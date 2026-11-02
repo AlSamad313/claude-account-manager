@@ -37,7 +37,7 @@ different moments. Keychain names at that time: `Claude Code-credentials` only.
 | 18 | **Pass for signals** | With status `busy`, a session in a pty ended 1.1 s after SIGINT. An idle one took 0.8 s. SIGTERM was not needed. Whether the Terminal window stays open is untested |
 | 19 | **Pass at the signal level** | Details below. Not yet seen in a real Terminal.app window |
 | 20 | **Pass** | In folder 1, `claude auth status --json` shows the account and its `configDirectory`. It could replace reading `.claude.json`, but the plan does not depend on that |
-| 21 | S3 | |
+| 21 | Partly | The unsigned tests and `cpm` listed Keychain names, and a process deleted an item it created, with no prompt. Deleting an item created by `claude` is untested, and matters only from S5 |
 | 22 | Partly | Details below. No harm seen in `-p` mode. Two interactive sessions untested |
 | 23 | **Done** | Details below |
 | 25 | **Pass** | With VS Code closed, `open -a "Visual Studio Code" --env ...` set both values on its process. With it running, `open` left the values alone and printed that the app "was already running and so the additional environment variables could not be set" |

@@ -600,7 +600,9 @@ may also write caches and registries the plan does not list. Rules:
     which were not.
 *   MCP servers: installed only with `claude mcp add-json <name> <json> --scope
     user` under the target's environment (S0 check 8). v1 never writes a config
-    file directly. Project-level `mcpServers` are not copied.
+    file directly. Project-level `mcpServers` are not copied. A changed server is removed with `claude mcp remove`
+    first, because `add-json` adds a new one. A server whose `args` hold a secret is copied only
+    if that secret is ticked, because a positional argument cannot be dropped.
 *   What may be copied is fixed by this table. Anything not listed is not
     copied and is not offered:
 
@@ -972,12 +974,11 @@ The app sets `CLAUDE_CONFIG_DIR` for the whole macOS login, and a LaunchAgent re
 
 ### Limits
 
-Nothing here has been measured. The design target is 10 profiles and 5,000
-transcripts, with the panel opening in under 1 second at that size. S2 measures
-this. A row may need more than a partial read if Claude Code's title sits deep
-in a large file; S2 also records whether that happens.
-
---------------------------------------------------------------------------------
+The design target is 10 profiles and 5,000 transcripts, with the panel opening in under 1 second at that size.
+Measured in S2 with `scripts/measure-panel.sh` on generated data, 2026-11-02: `cpm list` took 0.37 seconds, reading
+every transcript with no cache. That times reading the sessions, not a panel opening; S3 measures the panel. On this
+Mac's real 43 transcripts, the largest 72.9 MB, it took under 0.2 seconds before those speed-ups. All local titles
+sit in the first or last 64 KB; the reader widens to 1 MB when it finds none.
 
 ## Additional Resources
 
@@ -1530,8 +1531,8 @@ Run `git init`, then:
 *   **Proposed Changes**: Filter field; one row per profile (colour dot, display name, email,
     live count, default marker, "New Terminal", "Open VS Code", and "Not signed in — Sign in" when needed);
     8 most recent sessions, live first, each tagged with its profile, live rows with Stop and
-    others with Resume; footer items "Open window…", "Add profile…", "Set default ▸", "Copy
-    setup…" (S4), "Doctor", and "Set up shell" until installed.
+    others with Resume; footer items "Open window…", "Add profile…", "Copy setup…" (S4), "Doctor" and "Quit",
+    and "Set up shell" until installed. Each profile row has "Make default", and a menu with "Open VS Code" and "Settings…".
 
 ##### 51. `Sources/ProfileUI/MainWindowView.swift` (Create)
 
@@ -1578,7 +1579,7 @@ Run `git init`, then:
     instructions if unset; no hardened runtime, no entitlements. `--install` copies the app to
     `~/Applications`. Run S0 checks 9 and 21 here.
 
-##### 57. `Tests/ProfileCoreTests/AppFlowTests.swift` (Create)
+##### 57. `Tests/ProfileUITests/AppFlowTests.swift` (Create)
 
 *   **Type / Scope**: Unit tests. Views are exempt from unit tests and covered by
     `docs/E2E-checklist.md`.
@@ -1649,7 +1650,7 @@ Run in two steps, as in the stage table.
     *   "Uses OAuth sign-in. You will need to sign in again in <target>."
     *   "Not copyable: claude.ai connectors belong to the account. Connect them at claude.ai while signed in as <email>."
 
-##### 64. `Tests/ProfileCoreTests/SetupCopierTests.swift`, `SecretDetectorTests.swift`, `SettingsMergerTests.swift`, `BackupStoreTests.swift`, `Fixtures/golden/` (Create)
+##### 64. `Tests/ProfileCoreTests/SetupCopierTests.swift` (Create)
 
 *   **Type / Scope**: Golden-file and unit tests.
 *   **Proposed Changes**: The plan matches a stored golden plan. Direct writes match the plan.

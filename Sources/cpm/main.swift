@@ -9,6 +9,11 @@ func usage() -> Never {
       cpm retry <commandName>                         sign out and sign in again
       cpm discard <commandName>                       remove a profile waiting for a sign-in
       cpm default [<commandName>]                     show or set the default profile
+      cpm list [--profile <commandName>] [--live]     list sessions, tab-separated
+      cpm new <commandName> [folder]                  open a Terminal session on a profile
+      cpm resume <sessionId>                          resume on the profile that owns it
+      cpm stop <sessionId> [--yes]                    stop a running session
+      cpm code <commandName> [folder]                 open VS Code on a profile
       cpm doctor [--fix]                              check the setup
       cpm install-shell                               install the shell layer
     """)
@@ -41,6 +46,15 @@ func reconcile() throws {
 
 func shellQuote(_ s: String) -> String {
     "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+}
+
+func tabSafe(_ s: String) -> String {
+    s.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ")
+}
+
+/// Uses the display list, so a desktop app session cannot be resumed or stopped from here.
+func findRow(_ id: String, owner: Profile, index: SessionIndex) -> SessionRow? {
+    index.sessions(for: [owner]).rows.first { $0.sessionId == id }
 }
 
 func printDoctor(_ report: DoctorReport) {
@@ -98,6 +112,77 @@ do {
             print("Plain claude now uses \(p.displayName). Running sessions are not affected.")
         } else { usage() }
 
+    case "list":
+        var live = false
+        var filter: String?
+        var i = 0
+        while i < rest.count {
+            if rest[i] == "--live" { live = true; i += 1 }
+            else if rest[i] == "--profile", i + 1 < rest.count { filter = rest[i + 1]; i += 2 }
+            else { usage() }
+        }
+        try reconcile()
+        let reg = try store.load()
+        if let filter, reg.profile(commandName: filter) == nil { throw ProfileError.notFound(filter) }
+        let profiles = reg.profiles.filter { filter == nil || $0.commandName == filter }
+        let result = SessionIndex(locator: locator).sessions(for: profiles)
+        print(["PROFILE", "STATUS", "TITLE", "FOLDER", "SESSION"].joined(separator: "\t"))
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm"
+        for r in result.rows where !live || r.live {
+            let status = r.live ? "running \(r.status ?? "")".trimmingCharacters(in: .whitespaces) + (r.mayBeStale ? " (may be stale)" : "") : f.string(from: r.lastActivity)
+            let cmd = reg.profile(id: r.profileId)?.commandName ?? r.profileId
+            print([cmd, status, r.title, r.cwd ?? "-", r.sessionId].map(tabSafe).joined(separator: "\t"))
+        }
+
+    case "new":
+        guard (1...2).contains(rest.count) else { usage() }
+        try reconcile()
+        let folder = rest.count == 2 ? URL(fileURLWithPath: rest[1]) : nil
+        try Launcher(store: store).newSession(profile: try profile(rest[0]), folder: folder)
+        print("Opened Terminal on \(rest[0]).")
+
+    case "code":
+        guard (1...2).contains(rest.count) else { usage() }
+        try reconcile()
+        let folder = rest.count == 2 ? URL(fileURLWithPath: rest[1]) : nil
+        try Launcher(store: store).openVSCode(profile: try profile(rest[0]), folder: folder)
+        print("Opened VS Code on \(rest[0]).")
+
+    case "resume":
+        guard rest.count == 1 else { usage() }
+        try reconcile()
+        let reg = try store.load()
+        let index = SessionIndex(locator: locator)
+        guard let owner = index.ownerOf(sessionId: rest[0], in: reg.profiles) else { throw LauncherError.noOwner(rest[0]) }
+        guard let row = findRow(rest[0], owner: owner, index: index) else { throw LauncherError.noOwner(rest[0]) }
+        try Launcher(store: store).resume(session: row, owner: owner)
+        print("Opened Terminal on \(owner.commandName), resuming \(row.title).")
+
+    case "stop":
+        let yes = rest.contains("--yes")
+        let ids = rest.filter { $0 != "--yes" }
+        guard ids.count == 1, rest.count == ids.count + (yes ? 1 : 0) else { usage() }
+        try reconcile()
+        let reg = try store.load()
+        let index = SessionIndex(locator: locator)
+        guard let owner = index.ownerOf(sessionId: ids[0], in: reg.profiles),
+              let row = findRow(ids[0], owner: owner, index: index) else { throw LauncherError.noOwner(ids[0]) }
+        let result = SessionStopper(locator: locator).stop(row: row) { req in
+            print("Stop \"\(req.title)\" on \(owner.displayName), in \(req.folder ?? "unknown folder"), \(req.status ?? "status unknown")?")
+            if let w = req.warning { print(w) }
+            if yes { return true }
+            guard isatty(STDIN_FILENO) == 1 else { fail("Not stopped. Without a terminal to confirm on, use --yes.") }
+            print("Stop this session? [y/N] ", terminator: "")
+            return ["y", "yes"].contains(readLine()?.lowercased() ?? "")
+        }
+        switch result {
+        case .alreadyStopped: print("That session is not running.")
+        case .cancelled: print("Not stopped.")
+        case .stopped(let signal): print("Stopped with \(signal). The Terminal window stays open.")
+        case .didNotStop(let pid): fail("It did not stop. Its process ID is \(pid).", code: 2)
+        }
+
     case "doctor":
         // Without --fix, doctor must see faults rather than repair them.
         if rest == ["--fix"] {
@@ -125,6 +210,8 @@ do {
         usage()
     }
 } catch let e as ProfileError {
+    fail(e.description)
+} catch let e as LauncherError {
     fail(e.description)
 } catch {
     fail(error.localizedDescription)

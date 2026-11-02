@@ -87,6 +87,20 @@ import Testing
         #expect(try text(s.locator.namesFile).contains("a\t\(p.id)\t"))
     }
 
+    @Test func anUnchangedFileIsNotRewritten() throws {
+        let s = try Sandbox(); defer { s.cleanup() }
+        _ = try s.store.load()
+        let old = Date().addingTimeInterval(-500)
+        for f in [s.locator.registryFile, s.locator.namesFile, s.locator.defaultFile] {
+            try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: f.path)
+        }
+        try s.store.repairFiles()
+        for f in [s.locator.registryFile, s.locator.namesFile, s.locator.defaultFile] {
+            let m = try FileManager.default.attributesOfItem(atPath: f.path)[.modificationDate] as! Date
+            #expect(abs(m.timeIntervalSince(old)) < 2)
+        }
+    }
+
     @Test func unreadableRegistryIsNotOverwritten() throws {
         let s = try Sandbox(); defer { s.cleanup() }
         _ = try s.store.load()

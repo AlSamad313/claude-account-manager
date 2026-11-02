@@ -15,9 +15,13 @@ public enum TranscriptReader {
     static let maxWindow = 1024 * 1024
 
     public static func summary(of url: URL) -> TranscriptSummary? {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let size = attrs[.size] as? Int, let modified = attrs[.modificationDate] as? Date,
-              let h = try? FileHandle(forReadingFrom: url) else { return nil }
+        var st = stat()
+        guard stat(url.path, &st) == 0 else { return nil }
+        return summary(of: url, size: Int(st.st_size), modified: Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec)))
+    }
+
+    static func summary(of url: URL, size: Int, modified: Date) -> TranscriptSummary? {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? h.close() }
 
         var fields = read(handle: h, size: size, window: window)
@@ -45,6 +49,12 @@ public enum TranscriptReader {
             if partialFirst, !parts.isEmpty { parts.removeFirst() }
             if offset + length < size, !parts.isEmpty { parts.removeLast() }
             for line in parts {
+                // Parsing every line is slow. Once cwd and entrypoint are known, only title lines matter.
+                let mayMatter = f.cwd == nil || f.entrypoint == nil || contains(line, "-title\"") || contains(line, "\"summary\"")
+                guard mayMatter else {
+                    f.lines += 1
+                    continue
+                }
                 guard let obj = (try? JSONSerialization.jsonObject(with: Data(line))) as? [String: Any] else { continue }
                 f.lines += 1
                 if let v = obj["cwd"] as? String, f.cwd == nil { f.cwd = v }
@@ -58,6 +68,10 @@ public enum TranscriptReader {
             }
         }
         return f
+    }
+
+    private static func contains(_ bytes: Data.SubSequence, _ mark: StaticString) -> Bool {
+        bytes.withUnsafeBytes { memmem($0.baseAddress, $0.count, mark.utf8Start, mark.utf8CodeUnitCount) != nil }
     }
 
     private static func ranges(size: Int, window: Int) -> [(Int, Int, Bool)] {

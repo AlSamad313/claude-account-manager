@@ -218,16 +218,22 @@ public final class ProfileStore {
     }
 
     private func writeAll(_ r: Registry) throws {
-        try AtomicFile.write(try Self.encoder.encode(r), to: locator.registryFile, mode: 0o600)
+        try writeIfChanged(try Self.encoder.encode(r), to: locator.registryFile)
         try writeTextFiles(r)
+    }
+
+    /// A rewrite with the same bytes would wake the app's file watcher for nothing.
+    private func writeIfChanged(_ data: Data, to url: URL) throws {
+        if let old = try? Data(contentsOf: url), old == data { return }
+        try AtomicFile.write(data, to: url, mode: 0o600)
     }
 
     private func writeTextFiles(_ r: Registry) throws {
         let lines = r.profiles.filter(\.isInNames).map { p in
             [p.commandName, p.id, p.displayName, p.color, p.configDir ?? "-"].joined(separator: "\t")
         }
-        try AtomicFile.write(Data((lines.joined(separator: "\n") + "\n").utf8), to: locator.namesFile, mode: 0o600)
-        try AtomicFile.write(Data((r.defaultProfileId + "\n").utf8), to: locator.defaultFile, mode: 0o600)
+        try writeIfChanged(Data((lines.joined(separator: "\n") + "\n").utf8), to: locator.namesFile)
+        try writeIfChanged(Data((r.defaultProfileId + "\n").utf8), to: locator.defaultFile)
     }
 
     private static func newID(existing: [String]) -> String {
