@@ -37,13 +37,14 @@ public struct ProcessRunner: ProcessRunning {
 
         let box = OutputBox()
         let group = DispatchGroup()
+        // Own threads, not the shared pool: when the pool is busy, a queued read can start too late and lose the output.
         group.enter()
-        DispatchQueue.global().async {
+        Thread.detachNewThread {
             box.setOut(outPipe.fileHandleForReading.readDataToEndOfFile())
             group.leave()
         }
         group.enter()
-        DispatchQueue.global().async {
+        Thread.detachNewThread {
             box.setErr(errPipe.fileHandleForReading.readDataToEndOfFile())
             group.leave()
         }
