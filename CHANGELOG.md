@@ -11,6 +11,8 @@ Newest first. There are no versioned releases yet.
 - A menu-bar icon that takes the default profile's colour, and a new app icon.
 - Contributor documentation, issue and pull request templates, and CI.
 - `scripts/make-release.sh`, which packs a universal app for download.
+- The start of a Windows version in `windows/`: `cpm` and the `claude` and `claude-as` wrappers.
+- CI on Windows, and line-ending rules so both platforms can work on the same files.
 
 ### Fixed
 

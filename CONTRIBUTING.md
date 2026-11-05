@@ -11,7 +11,18 @@ Bug reports, fixes, documentation and features are all welcome. By contributing,
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first. The **safety rules** there protect people's logins and history. A change that breaks one won't be merged.
 
-## Set up
+## Two platforms, one project
+
+| | macOS | Windows |
+|---|---|---|
+| Code | `Sources/`, `shell/`, `Tests/`, `ShellTests/` | `windows/` |
+| Language | Swift and zsh | C# on .NET 10 |
+| Status | Working | In progress, see [windows/README.md](windows/README.md) |
+| Design | [claude-profile-manager.md](docs/designs/claude-profile-manager.md) | [claude-profile-manager-windows.md](docs/designs/claude-profile-manager-windows.md), which lists only the differences |
+
+The two share no code, but they share the same features and safety rules. If you change behaviour on one platform, say in your pull request whether the other needs the same change, and open an issue if it does. You only need to build and test the platform you changed: CI runs both on every pull request.
+
+## Set up on macOS
 
 You need a Mac with macOS 14 or later, and Xcode or the Command Line Tools with Swift 6.
 
@@ -24,7 +35,17 @@ cd claude-account-manager
 
 Building installs nothing. `./make-app.sh --install` copies the app to `~/Applications`.
 
-## Run the tests
+## Set up on Windows
+
+See [windows/README.md](windows/README.md) for what to install. Then:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File windows\build.ps1 -Test   # build and run the tests
+```
+
+Building installs nothing. Only `-Install` changes your `PATH`.
+
+## Run the tests on macOS
 
 ```sh
 zsh scripts/test.sh                # Swift tests
@@ -73,13 +94,13 @@ This tool relies on Claude Code's folders and file formats, which can change wit
 
 ## Send a pull request
 
-1. Create a branch from `main`.
+1. Create a branch from `main`, named for the change, such as `fix-copy-preview`. Don't name a branch `windows`, because Git confuses it with the folder.
 2. Make one focused change.
-3. Run all three test commands above.
+3. Run the tests for the platform you changed.
 4. Update the README, the Guide, the checklist and [CHANGELOG.md](CHANGELOG.md) if behaviour changed.
 5. Open the pull request and fill in the template.
 
-**Keep personal data out:** no emails, usernames, tokens, or real paths and project names, in code, tests, logs, screenshots or commit messages. Use `you@example.com` and `/Users/me/...`.
+**Keep personal data out:** no emails, usernames, tokens, or real paths and project names, in code, tests, logs, screenshots or commit messages. Use `you@example.com` and `/Users/me/...`. Commits show your Git email publicly, so consider your [GitHub noreply address](https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-personal-account-on-github/managing-email-preferences/setting-your-commit-email-address).
 
 If an AI tool helped write your change, that's fine. You're still responsible for understanding it and checking that it works.
 
@@ -87,6 +108,7 @@ If an AI tool helped write your change, that's fine. You're still responsible fo
 
 These are open if you want them. Please open an issue to claim one.
 
+- Windows: listing and stopping sessions, the tray app, Copy setup and profile removal (stages W2 to W5 in the [Windows design](docs/designs/claude-profile-manager-windows.md))
 - Support for terminals other than Terminal.app, such as iTerm2
 - An option to start the app at login
 - A signed and notarized release, or a Homebrew cask, so the macOS warning goes away
