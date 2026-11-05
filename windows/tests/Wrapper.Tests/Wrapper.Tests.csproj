@@ -1,0 +1,3 @@
+<Project Sdk="MSTest.Sdk">
+  <!-- Runs the published wrapper from build\ against the published fake claude.exe. build.ps1 -Test publishes both first. -->
+</Project>

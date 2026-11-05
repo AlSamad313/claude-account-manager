@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ProfileCore/ProfileCore.csproj" />
+    <Project Path="src/Wrapper/Wrapper.csproj" />
+    <Project Path="src/Cpm/Cpm.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ProfileCore.Tests/ProfileCore.Tests.csproj" />
+    <Project Path="tests/Wrapper.Tests/Wrapper.Tests.csproj" />
+    <Project Path="tests/FakeClaude/FakeClaude.csproj" />
+  </Folder>
+</Solution>
