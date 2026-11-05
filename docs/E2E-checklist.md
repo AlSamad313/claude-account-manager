@@ -1,14 +1,14 @@
 # Hands-on test script
 
-WRP from top to bottom, because later parts depend on earlier ones. Allow about 2 to 3 hours. You can stop between any two parts.
+Work from top to bottom, because later parts depend on earlier ones. Allow about 2 to 3 hours. You can stop between any two parts.
 
 Tick a box only when everything under **Expect** happened. If anything differs, don't work around it. Note the step number and
 carry on if you can. "When something goes wrong" at the end says what to send.
 
 Names used here:
 
-- **Personal:** the account `~/.claude` is signed into today. This built-in profile has the command `main`, and the app shows it under your personal name.
-- **Official:** your company account, already added as the profile `WRP`, with the command `wrp`.
+- **Personal:** the account `~/.claude` is signed into today. This built-in profile has the command `main`.
+- **Official:** a second Claude account, which becomes the profile `Work`, with the command `work`.
 - **Test:** a throwaway profile, signed into Personal, and removed in Part 11.
 
 Paste each command into Terminal.app, one block at a time.
@@ -25,11 +25,10 @@ Paste each command into Terminal.app, one block at a time.
   zsh scripts/s0-checks.sh names
   shasum ~/.claude/settings.json
   ls ~/.claude-profiles
-  ls -d ~/claude-profile-backup-2026-11-02
   mkdir -p ~/cpm-test/a ~/cpm-test/b
   ```
 
-  **Expect:** Personal is signed in. Keychain shows only the plain `Claude Code-credentials`. `~/.claude-profiles` does not exist, and the backup does.
+  **Expect:** Personal is signed in. Keychain shows only the plain `Claude Code-credentials`. `~/.claude-profiles` does not exist.
 
 **If plain `claude` ever stops working:** run `/opt/homebrew/bin/claude`, which skips this tool. To turn the tool off, delete the two added
 lines from `~/.zshenv` and `~/.zshrc` and open a new window. Your `~/.claude` is never written to.
@@ -87,21 +86,19 @@ lines from `~/.zshenv` and `~/.zshrc` and open a new window. Your `~/.claude` is
 
 ## Part 3: Add your official account from the app
 
-Done on 2026-11-02, when WRP was added. Run 3.6 once to confirm, then go on to Part 4.
-
 This is the step most likely to feel broken, so watch it closely.
 
-- [ ] **3.1 Start.** Panel: Add profile…. Display name `WRP`. **Expect:** the command name suggests `wrp`. Pick a colour, then Continue to sign-in.
-- [ ] **3.2 Terminal opens.** **Expect:** a window running `claude-as wrp auth login`, and the app on "Waiting for sign-in…". **No macOS permission prompt** (S0 check 9).
+- [ ] **3.1 Start.** Panel: Add profile…. Display name `Work`. **Expect:** the command name suggests `work`. Pick a colour, then Continue to sign-in.
+- [ ] **3.2 Terminal opens.** **Expect:** a window running `claude-as work auth login`, and the app on "Waiting for sign-in…". **No macOS permission prompt** (S0 check 9).
       If one appears, write down its exact wording. The panel will probably close by itself, which is fine.
 - [ ] **3.3 Sign in as Official.** Your normal browser may already be on Personal, so copy the sign-in link from Terminal into a private window. Finish in Terminal.
 - [ ] **3.4 Click the dot.** **Expect:** the waiting step, or "Signed in", with your official email and organization within about 5 seconds. If it stays on waiting for 15
       seconds, note it, close and reopen the panel, then try Open window….
-- [ ] **3.5 Keep.** **Expect:** back to the main list, with a WRP row in your colour. Close the sign-in Terminal window.
+- [ ] **3.5 Keep.** **Expect:** back to the main list, with a Work row in your colour. Close the sign-in Terminal window.
 - [ ] **3.6 Check both logins, in a Terminal window:**
 
   ```sh
-  claude-as wrp auth status
+  claude-as work auth status
   claude auth status
   zsh scripts/s0-checks.sh names
   cpm doctor
@@ -116,7 +113,7 @@ This is the step most likely to feel broken, so watch it closely.
   ```sh
   cpm add Bad --help '#000000'
   cpm add 'Bad' 'a b' '#000000'
-  cpm add Bad wrp '#000000'
+  cpm add Bad work '#000000'
   cpm add Bad bad red
   ```
 
@@ -159,7 +156,7 @@ This is the step most likely to feel broken, so watch it closely.
   claude auth status
   ```
 
-  **Expect:** only the plain item plus those for WRP and Test. Plain `claude` is still Personal.
+  **Expect:** only the plain item plus those for Work and Test. Plain `claude` is still Personal.
 
 ## Part 5: The default, and where it reaches
 
@@ -170,7 +167,7 @@ This is the step most likely to feel broken, so watch it closely.
   ```
 
   Accept the trust prompt and send: `Say hello in one word.`
-- [ ] **5.2 Change the default with the panel closed.** In window B: `cpm default wrp`. **Expect:** "Plain claude now uses WRP", the dot changes to WRP's colour within a
+- [ ] **5.2 Change the default with the panel closed.** In window B: `cpm default work`. **Expect:** "Plain claude now uses Work", the dot changes to Work's colour within a
       few seconds, and the panel header agrees.
 - [ ] **5.3 Follows with no reload.** Still in window B:
 
@@ -180,8 +177,8 @@ This is the step most likely to feel broken, so watch it closely.
   bash -lc 'claude auth status'
   ```
 
-  **Expect:** Official, Official, then `claude: command not found`. On this Mac a `bash -l` shell has no Homebrew on its `PATH`, so it finds no `claude`
-  at all. It is a documented exception, and never runs the wrong account.
+  **Expect:** Official, Official, then `claude: command not found`. If a `bash -l` shell has no Homebrew on its `PATH`, it finds no `claude`. Otherwise you'll see Personal. Either way this is
+  a documented exception, and it doesn't follow the default.
 - [ ] **5.4 A running session doesn't move.** In window A, type `! claude auth status`. **Expect:** Personal. Then `/exit`.
 - [ ] **5.5 New session follows.** In window A:
 
@@ -189,9 +186,9 @@ This is the step most likely to feel broken, so watch it closely.
   cd ~/cpm-test/b && claude
   ```
 
-  Finish any first-run screens and send `Say hello in one word.` **Expect:** the title shows WRP, and the status line shows `● WRP` (S0 check 10).
+  Finish any first-run screens and send `Say hello in one word.` **Expect:** the title shows Work, and the status line shows `● Work` (S0 check 10).
 - [ ] **5.6 Nested stays put.** In window B: `cpm default main`. In window A: `! claude auth status`. **Expect:** Official. Then `/exit`.
-- [ ] **5.7 Make default from the app.** On the WRP row press Make default. **Expect:** the DEFAULT mark and dot move. Then set it back to `main` the same way.
+- [ ] **5.7 Make default from the app.** On the Work row press Make default. **Expect:** the DEFAULT mark and dot move. Then set it back to `main` the same way.
 - [ ] **5.8 A damaged default stops safely.** Press Quit in the panel first, because the running app repairs this file by itself. Then:
 
   ```sh
@@ -223,18 +220,18 @@ This is the step most likely to feel broken, so watch it closely.
 
 ## Part 6: Sessions from the command line
 
-- [ ] **6.1 Start.** `cpm new wrp ~/cpm-test/a`. **Expect:** a new window opens. Send `Remember the word banana.` and then, in another window, run `cpm list --live`.
-      **Expect:** a WRP row within 5 seconds. Copy its session ID, which is the last column. Below, `<id>` means this ID.
-- [ ] **6.2 The title holds.** **Expect:** after Claude has replied, the window title still shows WRP (S0 check 19).
+- [ ] **6.1 Start.** `cpm new work ~/cpm-test/a`. **Expect:** a new window opens. Send `Remember the word banana.` and then, in another window, run `cpm list --live`.
+      **Expect:** a Work row within 5 seconds. Copy its session ID, which is the last column. Below, `<id>` means this ID.
+- [ ] **6.2 The title holds.** **Expect:** after Claude has replied, the window title still shows Work (S0 check 19).
 - [ ] **6.3 Live resume is refused.** `cpm resume <id>`. **Expect:** "already running".
 - [ ] **6.4 Find and resume.** Type `/exit` in that session, then:
 
   ```sh
-  cpm list --profile wrp
+  cpm list --profile work
   cpm resume <id>
   ```
 
-  In the new window ask `What word did I ask you to remember?` and run `! pwd`. **Expect:** banana, `~/cpm-test/a`, and WRP in the title.
+  In the new window ask `What word did I ask you to remember?` and run `! pwd`. **Expect:** banana, `~/cpm-test/a`, and Work in the title.
 - [ ] **6.5 Wrong profile is refused.** Leave that session running. In another window:
 
   ```sh
@@ -242,8 +239,8 @@ This is the step most likely to feel broken, so watch it closely.
   claude --resume <id>
   ```
 
-  **Expect:** both say it belongs to WRP, give the right command, and don't start.
-- [ ] **6.6 Stop a busy session.** In the WRP session send `Run the shell command sleep 120, then tell me it finished.` and approve it. Then in another window:
+  **Expect:** both say it belongs to Work, give the right command, and don't start.
+- [ ] **6.6 Stop a busy session.** In the Work session send `Run the shell command sleep 120, then tell me it finished.` and approve it. Then in another window:
 
   ```sh
   cpm list --live
@@ -264,28 +261,28 @@ This is the step most likely to feel broken, so watch it closely.
 
   ```sh
   mkdir -p ~/cpm-test/'odd '"'"'$(touch PWNED) name'
-  cpm new wrp ~/cpm-test/'odd '"'"'$(touch PWNED) name'
+  cpm new work ~/cpm-test/'odd '"'"'$(touch PWNED) name'
   ```
 
   **Expect:** the session opens in that folder. Type `/exit`, then `find ~/cpm-test ~ -maxdepth 2 -name PWNED` prints nothing.
 - [ ] **6.10 Hand-started sessions count.** In Terminal, `cd ~/cpm-test/b && claude-as test`, and send a message. **Expect:** `cpm list --live` shows it on `test`. Then `/exit`.
-- [ ] **6.11 VS Code, closed.** `cpm code wrp ~/cpm-test/a`. In VS Code's Claude Code, check the account, and in its terminal run `claude auth status`. **Expect:** Official.
+- [ ] **6.11 VS Code, closed.** `cpm code work ~/cpm-test/a`. In VS Code's Claude Code, check the account, and in its terminal run `claude auth status`. **Expect:** Official.
 - [ ] **6.12 VS Code, open.** `cpm code main`. **Expect:** it says to quit VS Code first, and nothing changes. Then quit VS Code.
 
 ## Part 7: Sessions from the app
 
-- [ ] **7.1 New Terminal.** Panel: New Terminal on WRP. **Expect:** a window with WRP in its title, no permission prompt, and a running row within 5 seconds of reopening the panel.
-      It opens in your home folder, so a trust prompt is normal. Send a short message, then `/exit`.
+- [ ] **7.1 New Terminal.** Panel: New Terminal on Work. **Expect:** a window with Work in its title, no permission prompt, and a running row within 5 seconds of reopening the panel.
+      It first asks for a folder: Cancel must start nothing, then try again, choose one and press Open Terminal. A trust prompt is normal in a new folder. Send a short message, then `/exit`.
 - [ ] **7.2 The list stays fresh.** Close the panel. Run `cpm new test ~/cpm-test/b` and send a message. Reopen the panel. **Expect:** that session appears within a few seconds. If it doesn't update
       while the panel is open, note that. This is a known risk.
 - [ ] **7.3 Stop, busy.** In that session send `Run the shell command sleep 120, then tell me it finished.` and approve it. Press Stop on its row. **Expect:** a warning that Claude is working. Press Cancel,
       then Stop again, then Stop session. **Expect:** the window stays open, and the row stops being live within 10 seconds.
-- [ ] **7.4 Filter and resume.** Type part of a title, then a folder, then a profile name. **Expect:** the list narrows each time. Press Resume on a WRP session. **Expect:** it continues in the right profile and folder.
+- [ ] **7.4 Filter and resume.** Type part of a title, then a folder, then a profile name. **Expect:** the list narrows each time. Press Resume on a Work session. **Expect:** it continues in the right profile and folder.
       Then `/exit`.
-- [ ] **7.5 Missing folder.** Run `cpm new wrp ~/cpm-test/b`, send a message, `/exit`, then `rm -r ~/cpm-test/b`. Press Resume on it. **Expect:** "no longer exists", and "Choose folder…". Choose `~/cpm-test/a`.
+- [ ] **7.5 Missing folder.** Run `cpm new work ~/cpm-test/b`, send a message, `/exit`, then `rm -r ~/cpm-test/b`. Press Resume on it. **Expect:** "no longer exists", and "Choose folder…". Choose `~/cpm-test/a`.
       **Expect:** it resumes there, or says clearly why not. Then `/exit`, and `mkdir ~/cpm-test/b`.
-- [ ] **7.6 "⋯" menu.** On WRP, Open VS Code. **Expect:** it opens on Official. With it open, try again. **Expect:** it says to quit first. Then quit VS Code.
-- [ ] **7.7 Settings.** "⋯", Settings… on WRP. Change the name to `WRP2` and the colour, then Done. **Expect:** the row and dot update, and the command stays `wrp`. A new `claude-as wrp` shows `● WRP2`.
+- [ ] **7.6 "⋯" menu.** On Work, Open VS Code. **Expect:** it opens on Official. With it open, try again. **Expect:** it says to quit first. Then quit VS Code.
+- [ ] **7.7 Settings.** "⋯", Settings… on Work. Change the name to `Work2` and the colour, then Done. **Expect:** the row and dot update, and the command stays `work`. A new `claude-as work` shows `● Work2`.
       Change it back. On `main`, **Expect:** no Remove button, and a note that it is your existing `~/.claude`.
 - [ ] **7.8 The window.** Open window…. **Expect:** a sidebar and a table. Selecting a profile filters, and the New Terminal button follows the selection. Right-click a profile: New Terminal, Open VS Code, Make default, Settings….
 - [ ] **7.9 Panel and window together.** With the window open, press Add profile… in the panel. **Expect:** the same step also appears as a sheet in the window. Decide whether that bothers you, then Cancel.
@@ -294,61 +291,61 @@ This is the step most likely to feel broken, so watch it closely.
 
 ## Part 8: Copy setup
 
-Exit every WRP and Test session first. Variables for this part:
+Exit every Work and Test session first. Variables for this part:
 
 ```sh
-W=$(awk -F'\t' '$1=="wrp"{print $5}' ~/.claude-profiles/names)
+W=$(awk -F'\t' '$1=="work"{print $5}' ~/.claude-profiles/names)
 T=$(awk -F'\t' '$1=="test"{print $5}' ~/.claude-profiles/names)
 echo "$W"; echo "$T"
 ```
 
-- [ ] **8.1 The list.** No automated check has seen this screen. Use Open window… then Copy setup…. From the built-in, to WRP. **Expect:** group headings and Add/Change/Same badges.
+- [ ] **8.1 The list.** No automated check has seen this screen. Use Open window… then Copy setup…. From the built-in, to Work. **Expect:** group headings and Add/Change/Same badges.
       `linkedin` and `rea` are unticked with a warning that they may contain a secret. `meme-video` is flagged. **`skills/synced` isn't there.** Checkboxes and text are readable, and the list scrolls.
       The "To" menu never offers the built-in.
 - [ ] **8.2 Secrets are masked.** Tick `rea`. **Expect:** `Include env.… = ••••••` rows, each unticked, with no real value shown anywhere.
 - [ ] **8.3 Nothing ticked.** Untick everything. **Expect:** the Copy button is off.
-- [ ] **8.4 Refused while live.** Start `claude-as wrp` in Terminal. Switch To away and back. **Expect:** "WRP has a live session", and Copy is off. `/exit`, then switch To away and back. **Expect:** the message clears.
+- [ ] **8.4 Refused while live.** Start `claude-as work` in Terminal. Switch To away and back. **Expect:** "Work has a live session", and Copy is off. `/exit`, then switch To away and back. **Expect:** the message clears.
 - [ ] **8.5 Copy a small set.** Tick only `skills/reference-to-animation`, the `egm` plugin, and `rea` with its secrets unticked. Copy. **Expect:** "Copied 3 item(s)…", and removal commands for the plugin and server. Save those commands.
 - [ ] **8.6 It worked.**
 
   ```sh
   ls "$W/skills"
-  claude-as wrp plugin list
-  claude-as wrp mcp get rea
+  claude-as work plugin list
+  claude-as work mcp get rea
   shasum ~/.claude/settings.json
   ```
 
   **Expect:** the skill, the plugin and the server, with no secret values. The `shasum` matches 0.3, unless you changed settings yourself.
-- [ ] **8.7 In a real session.** `claude-as wrp`. **Expect:** the status line still shows `● WRP`. Ask `Which skills can you see?` **Expect:** the copied one is listed. `/exit`.
+- [ ] **8.7 In a real session.** `claude-as work`. **Expect:** the status line still shows `● Work`. Ask `Which skills can you see?` **Expect:** the copied one is listed. `/exit`.
 - [ ] **8.8 A ticked secret, using a fake value:**
 
   ```sh
   claude-as test mcp add sectest --scope user -e TOKEN=fake123 -- /bin/echo hi
   ```
 
-  Copy from Test to WRP with `sectest` and its `env.TOKEN` ticked. Then `claude-as wrp mcp get sectest`. **Expect:** it has TOKEN.
+  Copy from Test to Work with `sectest` and its `env.TOKEN` ticked. Then `claude-as work mcp get sectest`. **Expect:** it has TOKEN.
 - [ ] **8.9 Changing an MCP server:**
 
   ```sh
-  claude-as wrp mcp add copytest --scope user -- /bin/echo one
+  claude-as work mcp add copytest --scope user -- /bin/echo one
   claude-as test mcp add copytest --scope user -- /bin/echo two
   ```
 
-  Copy from WRP to Test. **Expect:** `copytest` shows Change. Tick it and copy. `claude-as test mcp get copytest` shows `one`.
+  Copy from Work to Test. **Expect:** `copytest` shows Change. Tick it and copy. `claude-as test mcp get copytest` shows `one`.
 - [ ] **8.10 Skip, Overwrite, Rename:**
 
   ```sh
   print one > "$W/CLAUDE.md"; print two > "$T/CLAUDE.md"
   ```
 
-  Copy from WRP to Test, with `CLAUDE.md` ticked. **Expect:** a Change badge and an "If it exists" choice. Do this three times, checking after each with `ls "$T"; cat "$T/CLAUDE.md"`:
+  Copy from Work to Test, with `CLAUDE.md` ticked. **Expect:** a Change badge and an "If it exists" choice. Do this three times, checking after each with `ls "$T"; cat "$T/CLAUDE.md"`:
   **Rename** gives `CLAUDE-copy.md` and leaves `two`. **Skip** changes nothing. **Overwrite** gives `one`.
 - [ ] **8.11 Changed after the preview.** Open the preview with `CLAUDE.md` ticked as a Change, using the window so that it stays open. In Terminal, `print three > "$T/CLAUDE.md"`. Press Copy.
       **Expect:** "changed since the preview. Nothing was copied", and `three` is still there.
-- [ ] **8.12 Restore, and later work.** Run `rm -f "$T/CLAUDE-copy.md"` and `print base > "$T/CLAUDE.md"`, then `print new > "$W/CLAUDE.md"`, and copy from WRP to Test with Overwrite. Then `print edited > "$T/CLAUDE.md"`.
+- [ ] **8.12 Restore, and later work.** Run `rm -f "$T/CLAUDE-copy.md"` and `print base > "$T/CLAUDE.md"`, then `print new > "$W/CLAUDE.md"`, and copy from Work to Test with Overwrite. Then `print edited > "$T/CLAUDE.md"`.
       Press Restore… and choose the newest. **Expect:** it lists `CLAUDE.md` as left alone, and `edited` is still there.
-- [ ] **8.13 Restore undoes what's unchanged.** Going back to From built-in, To WRP, Restore… and pick the backup from 8.5. **Expect:** the skill is deleted from `$W/skills`, and it shows commands for what it can't undo.
-- [ ] **8.14 The plugin.** Run the saved plugin removal command, then `claude-as wrp plugin list`. **Expect:** the plugin has gone. Also run the saved `rea` command and check with `claude-as wrp mcp list`.
+- [ ] **8.13 Restore undoes what's unchanged.** Going back to From built-in, To Work, Restore… and pick the backup from 8.5. **Expect:** the skill is deleted from `$W/skills`, and it shows commands for what it can't undo.
+- [ ] **8.14 The plugin.** Run the saved plugin removal command, then `claude-as work plugin list`. **Expect:** the plugin has gone. Also run the saved `rea` command and check with `claude-as work mcp list`.
 
 ## Part 9: Reboot
 
@@ -357,7 +354,7 @@ echo "$W"; echo "$T"
 
   ```sh
   claude auth status
-  claude-as wrp auth status
+  claude-as work auth status
   claude-as test auth status
   cpm doctor
   ```
@@ -371,8 +368,8 @@ This checks the tool has not disturbed the desktop app. It does not open the des
 - [ ] **10.1 Claude desktop app.** Open it. **Expect:** Personal, with your earlier sessions, and it still works.
 - [ ] **10.2 Cowork.** **Expect:** Personal, and it still works.
 - [ ] **10.3 Desktop session stays hidden.** Start a Code tab session. **Expect:** `cpm list --live` doesn't show it. End it.
-- [ ] **10.4 Rebuild.** Press Quit in the panel, then run `./make-app.sh --install` and reopen it from `~/Applications`. **Expect:** all profiles are still there. Note any permission prompt. This Mac has no signing identity,
-      so a prompt here may be expected, and the `SIGN_IDENTITY` check can't be done.
+- [ ] **10.4 Rebuild.** Press Quit in the panel, then run `./make-app.sh --install` and reopen it from `~/Applications`. **Expect:** all profiles are still there. Note any permission prompt. Without a signing identity,
+      a prompt here may be expected. If you have one, set `SIGN_IDENTITY` and confirm no prompt returns.
 
 ## Part 11: Removal
 
@@ -385,28 +382,27 @@ This checks the tool has not disturbed the desktop app. It does not open the des
   ```sh
   cpm default
   claude auth status
-  claude-as wrp auth status
+  claude-as work auth status
   claude-as test --version
   zsh scripts/s0-checks.sh names
   ```
 
-  **Expect:** `main`; **Personal still signed in**, although Test shared that account; Official; "no profile named 'test'"; and Test's Keychain item gone, with the plain and WRP items still there. The folder is in the Trash.
+  **Expect:** `main`; **Personal still signed in**, although Test shared that account; Official; "no profile named 'test'"; and Test's Keychain item gone, with the plain and Work items still there. The folder is in the Trash.
 - [ ] **11.6 Remove from the command line.** Add a profile with `cpm add Temp temp '#888888'`, sign in with `claude-as temp auth login`, then `cpm keep temp`. Run `cpm remove temp` and answer `y`. **Expect:** "Removed Temp", and other logins are unaffected.
 
 ## Part 12: Finish
 
-- [ ] **12.1 Clear the test data from WRP:**
+- [ ] **12.1 Clear the test data from Work:**
 
   ```sh
-  claude-as wrp mcp remove copytest --scope user
-  claude-as wrp mcp remove sectest --scope user
+  claude-as work mcp remove copytest --scope user
+  claude-as work mcp remove sectest --scope user
   rm -f "$W/CLAUDE.md"
   rm -r ~/cpm-test
   ```
 
 - [ ] **12.2 Final check.** `cpm doctor` shows no faults, and plain `claude` works.
-- [ ] **12.3 Delete the backup only when you're happy:** `~/claude-profile-backup-2026-11-02`.
-- [ ] **12.4 Optional, and only if you want everything gone.** `cpm uninstall` removes WRP too, so you'd sign in again later. Press Quit in the panel, run it, and answer `n` first. **Expect:** "Nothing changed". If you really want it, run it again and
+- [ ] **12.3 Optional, and only if you want everything gone.** `cpm uninstall` removes Work too, so you'd sign in again later. Press Quit in the panel, run it, and answer `n` first. **Expect:** "Nothing changed". If you really want it, run it again and
       answer `y`, then delete the two lines it prints and the app from `~/Applications`. In a new window `claude auth status` shows Personal.
 
 ## When something goes wrong

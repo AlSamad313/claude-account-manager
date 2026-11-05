@@ -1,6 +1,6 @@
 # Goldfish Review Report
 
-**Target:** `/Users/abdulsamadshahid/claude-account-manager/docs/designs/claude-profile-manager.md` (`Lines 1022-1721`, "## Detailed Implementation Plan" to the end of the file; lines 1-1021 used as the specification)
+**Target:** `docs/designs/claude-profile-manager.md` (`Lines 1022-1721`, "## Detailed Implementation Plan" to the end of the file; lines 1-1021 used as the specification)
 
 **Verdict:** Not ready to build: 4 Blockers and 25 Majors each leave a design choice to the implementer or conflict with the specification or the toolchain, so fix them first.
 

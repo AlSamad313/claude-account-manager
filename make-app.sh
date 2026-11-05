@@ -2,15 +2,21 @@
 # Builds build/ClaudeProfiles.app. `--install` copies it to ~/Applications.
 set -eu
 cd "${0:A:h}"
-swift build -c release --product ClaudeProfiles
-swift build -c release --product cpm
-bin=$(swift build -c release --show-bin-path)
+# scripts/make-release.sh passes binaries it has already built.
+if [[ -n ${PREBUILT_BIN-} ]]; then
+  bin=$PREBUILT_BIN
+else
+  swift build -c release --product ClaudeProfiles
+  swift build -c release --product cpm
+  bin=$(swift build -c release --show-bin-path)
+fi
 app=build/ClaudeProfiles.app
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/shell"
 cp "$bin/ClaudeProfiles" "$app/Contents/MacOS/ClaudeProfiles"
 cp Resources/Info.plist "$app/Contents/Info.plist"
 cp Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
+cp Resources/BurstMask.png "$app/Contents/Resources/BurstMask.png"
 cp "$bin/cpm" shell/bin/* "$app/Contents/Resources/shell/"
 chmod 755 "$app/Contents/Resources/shell/"{cpm,claude,claude-as,profile-label}
 identity=${SIGN_IDENTITY:--}

@@ -1,6 +1,6 @@
 # Goldfish Review Report
 
-**Target:** `/Users/abdulsamadshahid/claude-account-manager/docs/designs/claude-profile-manager.md` (`Lines 1-732`)
+**Target:** `docs/designs/claude-profile-manager.md` (`Lines 1-732`)
 
 ## Reviewer Status
 

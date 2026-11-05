@@ -43,22 +43,3 @@ private struct PanelHost: View {
         }
     }
 }
-
-/// Not a template image, so macOS does not recolour it.
-private enum MenuBarIcon {
-    static func image(hex: String) -> NSImage {
-        let size = NSSize(width: 18, height: 18)
-        let color = NSColor(Color(hex: hex))
-        let image = NSImage(size: size, flipped: false) { rect in
-            color.setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: 3, dy: 3)).fill()
-            NSColor.white.withAlphaComponent(0.85).setStroke()
-            let ring = NSBezierPath(ovalIn: rect.insetBy(dx: 3, dy: 3))
-            ring.lineWidth = 1
-            ring.stroke()
-            return true
-        }
-        image.isTemplate = false
-        return image
-    }
-}

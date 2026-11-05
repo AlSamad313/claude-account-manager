@@ -18,6 +18,7 @@ public struct FlowView: View {
             case .waiting(let id): WaitingForLoginView(model: model, profileId: id)
             case .settings(let id): ProfileSettingsView(model: model, profileId: id)
             case .doctor: DoctorView(model: model)
+            case .guide: GuideView(model: model)
             case .shell: ShellSetupView(model: model)
             case .stop(let id): StopConfirmation(model: model, sessionId: id)
             case .copy: CopySetupView(model: model)

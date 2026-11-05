@@ -58,7 +58,7 @@ struct ProfileRowView: View {
             if !isDefault {
                 Button("Make default") { model.setDefault(profile: profile) }.buttonStyle(.link).font(.system(size: 11.5))
             }
-            Button("New Terminal") { model.newSession(profile: profile) }.controlSize(.small).disabled(!model.shellInstalled)
+            Button("New Terminal") { model.chooseFolderAndStart(profile: profile) }.controlSize(.small).disabled(!model.shellInstalled)
         }
         Menu {
             Button("Open VS Code") { model.openVSCode(profile: profile) }

@@ -219,6 +219,27 @@ private final class Harness {
         #expect(h.model.liveCount(profileId: b.id) == 1)
     }
 
+    @Test func newTerminalStartsInTheChosenFolder() async throws {
+        let h = try Harness()
+        let a = try h.store.create(displayName: "A", commandName: "a", color: "#000000")
+        var asked: String?
+        h.model.chooseFolder = { asked = $0; return URL(fileURLWithPath: "/tmp/it's here") }
+        h.model.chooseFolderAndStart(profile: a)
+        await h.settle()
+        #expect(asked == "A")
+        #expect(h.opener.texts.first?.contains(#"dir='/tmp/it'\''s here'"#) == true)
+    }
+
+    @Test func cancellingTheFolderStartsNothing() async throws {
+        let h = try Harness()
+        let a = try h.store.create(displayName: "A", commandName: "a", color: "#000000")
+        h.model.chooseFolder = { _ in nil }
+        h.model.chooseFolderAndStart(profile: a)
+        await h.settle()
+        #expect(h.opener.texts.isEmpty)
+        #expect(h.model.errorText == nil)
+    }
+
     @Test func newSessionCallsLauncherThroughClaudeAs() async throws {
         let h = try Harness()
         let a = try h.store.create(displayName: "A", commandName: "a", color: "#000000")
@@ -412,6 +433,74 @@ private final class Counter: @unchecked Sendable {
     func add() { lock.lock(); n += 1; lock.unlock() }
 }
 
+@Suite @MainActor struct GuideTests {
+    @Test func everyTopicStaysShortAndHasNoPersonalDetails() {
+        #expect(Set(GuideTopic.all.map(\.title)).count == GuideTopic.all.count)
+        #expect(GuideTopic.all.count <= 12)
+        for t in GuideTopic.all {
+            #expect(t.summary.count <= 55, "\(t.summary)")
+            #expect(t.steps.count <= 4, "\(t.title)")
+            #expect(!t.steps.isEmpty || !t.commands.isEmpty || t.tip != nil, "\(t.title) has nothing to show")
+            for step in t.steps { #expect(step.count <= 55, "\(step)") }
+            for text in t.steps + [t.summary, t.tip ?? ""] { #expect(!text.contains("@"), "\(text)") }
+        }
+    }
+
+    @Test func theGuideOpensAndCloses() throws {
+        let h = try Harness()
+        h.model.route = .guide
+        #expect(h.model.route == .guide)
+        h.model.route = .main
+        #expect(h.model.route == .main)
+    }
+}
+
+@Suite @MainActor struct MenuBarIconTests {
+    private var mask: NSImage? {
+        NSImage(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/BurstMask.png"))
+    }
+
+    private func rep(_ image: NSImage, px: Int = 36) -> NSBitmapImageRep {
+        let r = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: r)
+        image.draw(in: NSRect(x: 0, y: 0, width: px, height: px))
+        NSGraphicsContext.restoreGraphicsState()
+        return r
+    }
+
+    @Test func theTileTakesTheProfileColour() throws {
+        let m = try #require(mask)
+        // Just inside the corner radius, away from the burst.
+        let c = try #require(rep(MenuBarIcon.image(hex: "#2F6FDE", mask: m)).colorAt(x: 6, y: 6)?.usingColorSpace(.sRGB))
+        #expect(c.blueComponent > c.redComponent + 0.3)
+        let o = try #require(rep(MenuBarIcon.image(hex: "#E8772E", mask: m)).colorAt(x: 6, y: 6)?.usingColorSpace(.sRGB))
+        #expect(o.redComponent > o.blueComponent + 0.3)
+    }
+
+    @Test func theBurstIsDrawnInWhiteOnADarkColourAndDarkOnALightOne() {
+        #expect(MenuBarIcon.burstColor(on: NSColor(Color(hex: "#2F6FDE"))) == .white)
+        #expect(MenuBarIcon.burstColor(on: NSColor(Color(hex: "#E8772E"))) == .white)
+        #expect(MenuBarIcon.burstColor(on: NSColor(Color(hex: "#FFF2A0"))) != .white)
+    }
+
+    @Test func withoutTheMaskItStillShowsTheColour() throws {
+        let c = try #require(rep(MenuBarIcon.image(hex: "#2F6FDE", mask: nil)).colorAt(x: 6, y: 6)?.usingColorSpace(.sRGB))
+        #expect(c.blueComponent > c.redComponent + 0.3)
+    }
+
+    @Test func render() throws {
+        guard let dir = ProcessInfo.processInfo.environment["CPM_RENDER_DIR"] else { return }
+        let m = try #require(mask)
+        for (name, hex) in [("blue", "#2F6FDE"), ("orange", "#E8772E"), ("green", "#2FA84F"), ("purple", "#8B5CF6"), ("cream", "#FFF2A0")] {
+            try rep(MenuBarIcon.image(hex: hex, mask: m), px: 72).representation(using: .png, properties: [:])!
+                .write(to: URL(fileURLWithPath: dir).appendingPathComponent("menubar-\(name).png"))
+            try rep(MenuBarIcon.image(hex: hex, mask: m), px: 36).representation(using: .png, properties: [:])!
+                .write(to: URL(fileURLWithPath: dir).appendingPathComponent("menubar-\(name)-2x.png"))
+        }
+    }
+}
+
 /// Writes PNGs of the real views when CPM_RENDER_DIR is set, so they can be looked at.
 @Suite @MainActor struct RenderViews {
     private func save<V: View>(_ view: V, _ name: String, in dir: String) {
@@ -430,11 +519,13 @@ private final class Counter: @unchecked Sendable {
         let a = try h.store.create(displayName: "Personal", commandName: "personal", color: "#E8772E")
         try h.signIn(a, uuid: "u2", email: "you@gmail.example")
         try h.store.completeLogin(id: a.id, account: Account(accountUuid: "u2", email: "you@gmail.example", organizationName: nil), keychainService: nil)
-        try h.transcript(b, id: "s1", title: "Urdu page layout", cwd: "/Users/me/Projects/mabel-website", age: 7000)
-        try h.transcript(a, id: "s2", title: "Minesweeper end card", cwd: "/Users/me/Projects/minesweeper-ad", age: 90000)
+        try h.transcript(b, id: "s1", title: "Landing page layout", cwd: "/Users/me/Projects/my-website", age: 7000)
+        try h.transcript(a, id: "s2", title: "Game end card", cwd: "/Users/me/Projects/my-game", age: 90000)
         try h.live(b, pid: 7, id: "running", title: "Phase 4 estimation ledger")
         await h.model.refresh()
         save(MenuPanelView(model: h.model, openWindow: {}), "panel", in: dir)
+        save(GuideTopics().padding(10).frame(width: 400), "guide-closed", in: dir)
+        save(GuideTopics(showAll: true).padding(10).frame(width: 400), "guide-open", in: dir)
         h.model.route = .add
         save(MenuPanelView(model: h.model, openWindow: {}), "add", in: dir)
         h.model.route = .stop(sessionId: "running")

@@ -2,7 +2,7 @@
 
 Author: Abdul Samad Shahid
 Date: 2026-11-01
-Source concept: /Users/abdulsamadshahid/claude-account-manager/concept_input.md (superseded by this brief)
+Source concept: concept_input.md (superseded by this brief)
 Mode: BRAINSTORM (multi-lens review, round 2)
 
 ## Reviewer Status (round 2)

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import ProfileCore
@@ -47,6 +48,7 @@ public enum Route: Equatable, Sendable {
     case waiting(profileId: String)
     case settings(profileId: String)
     case doctor
+    case guide
     case shell
     case stop(sessionId: String)
     case copy
@@ -89,6 +91,17 @@ public final class AppModel {
     private var watcher: FileWatcher?
     private var visibleCount = 0
     private var ticker: Task<Void, Never>?
+    /// Replaced in tests. The panel opens on the last folder chosen, which macOS remembers.
+    public var chooseFolder: (String) -> URL? = { name in
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.message = "Choose a folder for the \(name) session"
+        panel.prompt = "Open Terminal"
+        NSApp.activate()
+        return panel.runModal() == .OK ? panel.url : nil
+    }
     /// The newest action started from a button, so a test can wait for it.
     var lastAction: Task<Void, Never>?
 
@@ -221,7 +234,13 @@ public final class AppModel {
 
     // MARK: Sessions
 
-    public func newSession(profile: Profile) { launch { try $0.launcher.newSession(profile: profile) } }
+    public func newSession(profile: Profile, folder: URL? = nil) { launch { try $0.launcher.newSession(profile: profile, folder: folder) } }
+
+    /// New Terminal: asks which folder to start in. Cancelling starts nothing.
+    public func chooseFolderAndStart(profile: Profile) {
+        guard let folder = chooseFolder(profile.displayName) else { return }
+        newSession(profile: profile, folder: folder)
+    }
 
     public func openVSCode(profile: Profile) { launch { try $0.launcher.openVSCode(profile: profile) } }
 

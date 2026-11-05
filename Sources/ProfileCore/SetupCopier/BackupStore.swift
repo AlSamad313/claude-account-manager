@@ -37,9 +37,22 @@ public struct BackupStore {
         let fm = FileManager.default
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let id = f.string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        let dir = folder(profileId: profileId).appendingPathComponent(id)
-        try fm.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try fm.createDirectory(at: folder(profileId: profileId), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        // Named by the time, in order. Two in the same millisecond must not share a folder, so
+        // creating it has to be what claims the name, and a taken name moves on a millisecond.
+        var stamp = Date()
+        var id: String
+        var dir: URL
+        while true {
+            id = f.string(from: stamp).replacingOccurrences(of: ":", with: "-")
+            dir = folder(profileId: profileId).appendingPathComponent(id)
+            do {
+                try fm.createDirectory(at: dir, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+                break
+            } catch CocoaError.fileWriteFileExists {
+                stamp.addTimeInterval(0.001)
+            }
+        }
         try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder(profileId: profileId).path)
         var entries: [Entry] = []
         for (i, path) in paths.enumerated() {

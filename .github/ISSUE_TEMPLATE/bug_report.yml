@@ -1,0 +1,58 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Remove personal details before posting.** `cpm doctor` output includes your email addresses and paths. Never paste tokens or API keys.
+        For a security problem, use the Security tab instead of this form.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Press New Terminal on a profile
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "26.0"
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: Claude Code version
+      description: From `claude --version`.
+      placeholder: "2.1.296"
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where it happens
+      options:
+        - Menu-bar app
+        - cpm command
+        - claude or claude-as wrapper
+        - Copy setup
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: cpm doctor output
+      description: With your email addresses and paths removed.
+      render: text

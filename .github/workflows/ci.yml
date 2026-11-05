@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show tool versions
+        run: swift --version
+      - name: Check shell syntax
+        run: |
+          for f in shell/bin/claude shell/bin/claude-as shell/bin/claude-core.zsh shell/bin/claude-profiles.zsh shell/bin/profile-label make-cli.sh make-app.sh scripts/*.sh; do
+            zsh -n "$f"
+          done
+      - name: Swift tests
+        run: zsh scripts/test.sh
+      - name: Release build, warnings as errors
+        run: swift build -c release -Xswiftc -warnings-as-errors
+      - name: Build the command and app
+        run: |
+          ./make-cli.sh
+          ./make-app.sh
+      - name: Wrapper tests
+        run: zsh ShellTests/test_wrapper.zsh
+      - name: cpm tests
+        run: zsh ShellTests/test_cpm.zsh

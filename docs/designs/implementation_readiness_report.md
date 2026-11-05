@@ -1,6 +1,6 @@
 # Goldfish Review Report
 
-**Target:** `/Users/abdulsamadshahid/claude-account-manager/docs/designs/claude-profile-manager.md` (`Lines 951-1578`, "## Detailed Implementation Plan" to the end of the file)
+**Target:** `docs/designs/claude-profile-manager.md` (`Lines 951-1578`, "## Detailed Implementation Plan" to the end of the file)
 
 **Mode:** REVIEW. **GoldfishContext:** none. **Round:** 1.
 

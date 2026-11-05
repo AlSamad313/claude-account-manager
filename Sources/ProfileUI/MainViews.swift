@@ -68,6 +68,7 @@ public struct MenuPanelView: View {
                 footerButton("Open window…", action: openWindow)
                 footerButton("Copy setup…") { model.errorText = nil; model.route = .copy }
                 footerButton("Doctor") { model.route = .doctor }
+                footerButton("Guide") { model.route = .guide }
                 footerButton("Quit") { NSApp.terminate(nil) }
             }
             .padding(8)
@@ -118,7 +119,7 @@ public struct MainWindowView: View {
                             }
                             .tag(p.id)
                             .contextMenu {
-                                Button("New Terminal") { model.newSession(profile: p) }.disabled(!model.shellInstalled)
+                                Button("New Terminal") { model.chooseFolderAndStart(profile: p) }.disabled(!model.shellInstalled)
                                 Button("Open VS Code") { model.openVSCode(profile: p) }
                                 if p.id != model.defaultProfileId { Button("Make default") { model.setDefault(profile: p) } }
                                 Button("Settings…") { model.route = .settings(profileId: p.id) }
@@ -131,6 +132,7 @@ public struct MainWindowView: View {
                     Button { model.errorText = nil; model.route = .add } label: { Text("Add profile…").frame(maxWidth: .infinity) }
                     Button { model.errorText = nil; model.route = .copy } label: { Text("Copy setup…").frame(maxWidth: .infinity) }
                     Button { model.route = .doctor } label: { Text("Doctor").frame(maxWidth: .infinity) }
+                    Button { model.route = .guide } label: { Text("Guide").frame(maxWidth: .infinity) }
                 }.padding(8)
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 260)
@@ -171,7 +173,7 @@ public struct MainWindowView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("New Terminal on \(target?.displayName ?? "default")") {
-                        if let t = target { model.newSession(profile: t) }
+                        if let t = target { model.chooseFolderAndStart(profile: t) }
                     }
                     .disabled(!model.shellInstalled || target == nil)
                 }

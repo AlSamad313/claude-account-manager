@@ -1,10 +1,9 @@
 # Claude Profile Manager (macOS)
 
 *   **Author:** Abdul Samad Shahid
-*   **Status:** Proposed. Review concluded 2026-11-02. The 4 blockers in
-    [`implementation_readiness_report_round2.md`](implementation_readiness_report_round2.md)
-    are fixed; its 25 major and 31 minor findings are still open. These fixes have not
-    had a further independent review.
+*   **Status:** Implemented (S1 to S5). Kept for background; see
+    [the architecture guide](../ARCHITECTURE.md) for the current code. The later "Rules settled by the
+    pre-test audit" section records changes made after this design.
 *   **Date:** 2026-11-02
 
 --------------------------------------------------------------------------------
