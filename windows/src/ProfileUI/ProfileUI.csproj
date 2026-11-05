@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>ProfileUI</RootNamespace>
+    <!-- Dates and times in the user's own format. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ProfileCore\ProfileCore.csproj" />
+    <InternalsVisibleTo Include="ProfileUI.Tests" />
+  </ItemGroup>
+</Project>

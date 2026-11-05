@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <!-- Only for NotifyIcon: WPF has no tray icon (design, tray icon). -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- The WinForms implicit usings clash with WPF names, so usings are listed in Usings.cs. -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <AssemblyName>ClaudeProfiles</AssemblyName>
+    <RootNamespace>ClaudeProfiles</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- A placeholder made by scripts/make-icon.ps1, until the real icon arrives. -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- The app is in English; this leaves out the framework's translated messages. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- WPF0001: ThemeMode (the Fluent theme, design D7) is marked experimental in .NET 10. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ProfileUI\ProfileUI.csproj" />
+  </ItemGroup>
+</Project>

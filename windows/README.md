@@ -3,9 +3,9 @@
 The Windows version of Claude Profiles: several Claude Code accounts side by side, each in its own
 `CLAUDE_CONFIG_DIR` folder. The design is `../docs/designs/claude-profile-manager-windows.md`.
 
-**Status: stage W1.** `cpm` (add, keep, retry, discard, default, doctor, install-shell, uninstall-shell)
-and the `claude` / `claude-as` wrapper work. Listing and stopping sessions (W2), the tray app (W3), copy
-setup (W4) and removal (W5) are still to come.
+**Status: stage W3.** The tray app and its window, `cpm` (add, keep, retry, discard, default, list, new,
+resume, stop, code, doctor, install-shell, uninstall-shell) and the `claude` / `claude-as` wrapper work.
+Copy setup (W4) and removal (W5) are still to come.
 
 ## Requirements
 
@@ -21,14 +21,20 @@ setup (W4) and removal (W5) are still to come.
 Windows blocks scripts by default, so run the build script with `-ExecutionPolicy Bypass`:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File windows\build.ps1          # build into windows\build\bin
+powershell -NoProfile -ExecutionPolicy Bypass -File windows\build.ps1          # build into windows\build
 powershell -NoProfile -ExecutionPolicy Bypass -File windows\build.ps1 -Test    # and run the tests
-powershell -NoProfile -ExecutionPolicy Bypass -File windows\build.ps1 -Install # and install
+powershell -NoProfile -ExecutionPolicy Bypass -File windows\build.ps1 -Install # and install the app
 ```
 
-`-Install` runs `cpm install-shell`. It copies `cpm.exe`, `claude.exe` and `claude-as.exe` to
-`%USERPROFILE%\.claude-profiles\bin`, and puts that folder first in your user `PATH`. The old `PATH` is
-saved in `%USERPROFILE%\.claude-profiles\logs\writes.log`. Open a new terminal window, then:
+`-Install` copies the app to `%LOCALAPPDATA%\Programs\ClaudeProfiles`, adds a Start menu shortcut, an
+entry in Settings > Apps > Installed apps and a Start with Windows value, and starts it. Its coloured dot
+appears by the clock, or in the overflow (^) area. On first start the panel asks you to **Set up command
+line**. That copies `cpm.exe`, `claude.exe` and `claude-as.exe` to `%USERPROFILE%\.claude-profiles\bin`,
+puts that folder first in your user `PATH`, and can add tab completion to your PowerShell profile. The old
+`PATH` is saved in `%USERPROFILE%\.claude-profiles\logs\writes.log`. `cpm install-shell [--completion]` does
+the same from the command line.
+
+Then add profiles from the panel, or in a new terminal window:
 
 ```powershell
 cpm doctor
@@ -38,17 +44,23 @@ cpm keep personal
 claude-as personal
 ```
 
-Plain `claude` runs the default profile, which starts as your existing login. `cpm default <name>` changes it.
+Plain `claude` runs the default profile, which starts as your existing login. `cpm default <name>` or Make
+default in the panel changes it.
 
-To undo the `PATH` change: `cpm uninstall-shell`. Your profiles and `~\.claude` are not touched.
+To undo the `PATH` change and the completion line: `cpm uninstall-shell`. To remove the app: Settings >
+Apps > Installed apps > Claude Profiles > Uninstall. Neither touches your profiles or `~\.claude`.
 
 ## Layout
 
 ```text
-src/ProfileCore/   the rules: profiles, sign-in, doctor, install (class library)
-src/Shared/        the names reader and real-binary rule, compiled into ProfileCore and the wrapper
-src/Wrapper/       claude.exe / claude-as.exe (Native AOT); never reads JSON
-src/Cpm/           cpm.exe (Native AOT)
-tests/             MSTest: ProfileCore.Tests, Wrapper.Tests, and FakeClaude for the wrapper tests
-scripts/           the stage W0 check scripts
+src/ProfileCore/     the rules: profiles, sign-in, sessions, stop, doctor, install (class library)
+src/Shared/          the names reader, real-binary rule and launch request, compiled into ProfileCore and the wrapper
+src/Wrapper/         claude.exe / claude-as.exe (Native AOT); never reads JSON
+src/Cpm/             cpm.exe (Native AOT)
+src/ProfileUI/       the app's model, panel, flow steps and window (WPF library)
+src/ClaudeProfiles/  ClaudeProfiles.exe: tray icon, panel placement, one running copy, install and uninstall
+src/Shell/           claude-profiles.ps1, the PowerShell tab completion
+tests/               MSTest: ProfileCore.Tests, ProfileUI.Tests (model, views, and the built app through UI Automation),
+                     Wrapper.Tests, and FakeClaude for the wrapper tests
+scripts/             the stage W0 check scripts, and measure-panel.ps1 (cpm list on 5,000 generated transcripts)
 ```

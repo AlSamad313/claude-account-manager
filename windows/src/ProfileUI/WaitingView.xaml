@@ -1,0 +1,46 @@
+<ui:FlowBase x:Class="ProfileUI.WaitingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:ProfileUI">
+    <ui:FlowBase.Resources>
+        <ResourceDictionary Source="/ProfileUI;component/Theme.xaml" />
+    </ui:FlowBase.Resources>
+    <StackPanel>
+        <!-- Signed in: the user checks the account before anything is kept. -->
+        <StackPanel x:Name="Detected">
+            <TextBlock Text="Signed in" Style="{StaticResource FlowTitle}" />
+            <TextBlock x:Name="AccountText" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock x:Name="OrgText" TextWrapping="Wrap" />
+            <Border x:Name="DuplicateBox" Style="{StaticResource Caution}" Margin="0,10,0,0">
+                <TextBlock x:Name="DuplicateText" Style="{StaticResource Wrapped}" />
+            </Border>
+            <TextBlock Text="Is this the account you meant to add?" Style="{StaticResource Secondary}" Margin="0,10,0,0" />
+            <DockPanel Margin="0,12,0,0">
+                <Button Content="Discard" Style="{StaticResource DialogButton}" Margin="0" Click="Discard" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="KeepButton" Content="Keep" IsDefault="True" Style="{DynamicResource AccentButtonStyle}" MinWidth="88" Click="Keep" />
+                    <Button Content="Sign out and retry" Style="{StaticResource DialogButton}" Click="Retry" />
+                </StackPanel>
+            </DockPanel>
+        </StackPanel>
+
+        <StackPanel x:Name="Waiting">
+            <TextBlock x:Name="WaitingTitle" Text="Waiting for sign-in…" Style="{StaticResource FlowTitle}" />
+            <TextBlock x:Name="WaitingText" Style="{StaticResource Wrapped}" />
+            <Border x:Name="BrowserWarning" Style="{StaticResource Caution}" Margin="0,10,0,0">
+                <TextBlock Style="{StaticResource Wrapped}"
+                           Text="Check the browser is signed into the account you want, or use a private window. Otherwise this profile may sign into an account you already added." />
+            </Border>
+            <DockPanel Margin="0,12,0,0">
+                <Button Content="Close" Style="{StaticResource DialogButton}" Margin="0" IsCancel="True" Click="Home" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Retry" Style="{StaticResource DialogButton}" Click="Retry" />
+                    <Button Content="Discard" Style="{StaticResource DialogButton}" Click="Discard" />
+                </StackPanel>
+            </DockPanel>
+        </StackPanel>
+
+        <TextBlock Text="{Binding ErrorText}" Style="{StaticResource Error}" Margin="0,10,0,0"
+                   Visibility="{Binding ErrorText, Converter={StaticResource Shown}}" />
+    </StackPanel>
+</ui:FlowBase>

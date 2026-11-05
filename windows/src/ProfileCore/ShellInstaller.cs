@@ -2,10 +2,10 @@ using ProfileCore.Shared;
 
 namespace ProfileCore;
 
-public sealed record InstallResult(bool PathChanged, IReadOnlyList<string> Updated);
+public sealed record InstallResult(bool PathChanged, IReadOnlyList<string> Updated, IReadOnlyList<string>? CompletionAdded = null);
 
 /// Owns flow 10 steps 1 to 3. Safe to repeat, and never resets the default.
-public sealed class ShellInstaller(ProfileStore store, UserPath? userPath = null)
+public sealed class ShellInstaller(ProfileStore store, UserPath? userPath = null, PowerShellProfile? powerShell = null)
 {
     public const string Version = "1";
 
@@ -14,16 +14,45 @@ public sealed class ShellInstaller(ProfileStore store, UserPath? userPath = null
         [("cpm.exe", "cpm.exe"), ("claude.exe", "claude.exe"), ("claude-as.exe", "claude.exe")];
 
     readonly UserPath userPath = userPath ?? new UserPath(store.Locator);
+    public PowerShellProfile PowerShell { get; } = powerShell ?? new PowerShellProfile(store.Locator);
+
+    /// Copied when the source folder has it; needed only for tab completion.
+    public const string CompletionScript = "claude-profiles.ps1";
     ConfigLocator L => store.Locator;
 
-    public InstallResult Install(string sourceDir)
+    public InstallResult Install(string sourceDir, bool completion = false)
     {
         store.Load();
+        var updated = CopyFiles(sourceDir);
+        store.RepairFiles();
+        var changed = userPath.EnsureFirst();
+        List<string>? added = null;
+        if (completion)
+        {
+            if (!File.Exists(Path.Combine(L.BinDir, CompletionScript)))
+                throw new ProfileException($"Missing {Path.Combine(sourceDir, CompletionScript)}, which tab completion needs.");
+            added = PowerShell.Add();
+        }
+        return new InstallResult(changed, updated, added);
+    }
+
+    /// Flow 10, upgrade: when the app starts, it refreshes bin\ from its own copy if the files
+    /// differ. It never installs from scratch and never touches PATH: that needs the user's choice.
+    public IReadOnlyList<string> UpdateIfInstalled(string sourceDir)
+    {
+        if (!IsInstalled() || !Files.All(f => File.Exists(Path.Combine(sourceDir, f.Source)))) return [];
+        return CopyFiles(sourceDir);
+    }
+
+    List<string> CopyFiles(string sourceDir)
+    {
         Directory.CreateDirectory(L.BinDir);
         Directory.CreateDirectory(L.LogsDir);
         DeleteOldCopies();
         var updated = new List<string>();
-        foreach (var (target, source) in Files)
+        var files = Files.ToList();
+        if (File.Exists(Path.Combine(sourceDir, CompletionScript))) files.Add((CompletionScript, CompletionScript));
+        foreach (var (target, source) in files)
         {
             var from = Path.Combine(sourceDir, source);
             if (!File.Exists(from)) throw new ProfileException($"Missing {from}. Run build.ps1 first.");
@@ -35,9 +64,7 @@ public sealed class ShellInstaller(ProfileStore store, UserPath? userPath = null
             updated.Add(target);
         }
         AtomicFile.Write(Path.Combine(L.BinDir, "VERSION"), System.Text.Encoding.UTF8.GetBytes(Version + "\n"));
-        store.RepairFiles();
-        var changed = userPath.EnsureFirst();
-        return new InstallResult(changed, updated);
+        return updated;
     }
 
     public bool IsInstalled() => Files.All(f => File.Exists(Path.Combine(L.BinDir, f.Target)));

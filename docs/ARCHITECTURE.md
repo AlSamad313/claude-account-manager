@@ -78,7 +78,7 @@ Every change must keep these. Many have tests, and a pull request that breaks on
 **Running things**
 
 10. **Quote every value that reaches a shell.** A `.command` file may only change folder and run `claude-as`, and a folder value is used only as `"$dir"`. Folder names come from transcripts, so treat them as hostile.
-11. **Never edit the user's shell files.** Print the lines for them to add.
+11. **Never edit the user's shell files.** Print the lines for them to add. On Windows, "Set up command line" makes the change itself instead ([design D1](designs/claude-profile-manager-windows.md)). It adds or removes only its own entry in the user `PATH`. Only if the user ticks its checkbox does it also add one marked line to `$PROFILE`, for tab completion. It writes the old values to `writes.log` first, and `cpm uninstall-shell` takes both out again.
 
 **Destructive actions**
 

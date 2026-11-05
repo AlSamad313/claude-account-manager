@@ -313,7 +313,7 @@ public sealed class WrapperTests
         string[] values =
         [
             "plain", "with space", "embedded \"quote\"", @"trailing\", @"back\""slash", @"\\server\share\", "", " ",
-            "%PATH%", "!BANG!", "^ & | < >", "tab\there", "Ünïcødé 中文 😀", ";", "'", "-x", "--flag=value",
+            "%PATH%", "!BANG!", "^ & | < >", "tab\there", "ÃœnÃ¯cÃ¸dÃ© ä¸­æ–‡ ðŸ˜€", ";", "'", "-x", "--flag=value",
         ];
         using var h = new Home();
         var r = h.ClaudeAs(["personal", .. values]);
@@ -352,5 +352,116 @@ public sealed class WrapperTests
             best = Math.Min(best, t.Elapsed.TotalMilliseconds);
         }
         return best;
+    }
+}
+
+/// Design flow 2: the window cpm or the app opens runs claude-as --launch <request>.
+[TestClass]
+public sealed class LaunchModeTests
+{
+    static string Request(Home h, string folder, string command = "personal", string[]? args = null, DateTime? created = null, string? dir = null)
+    {
+        var runDir = dir ?? Path.Combine(h.Root, "run");
+        Directory.CreateDirectory(runDir);
+        var file = Path.Combine(runDir, Guid.NewGuid().ToString("D") + ".launch");
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            commandName = command, folder, arguments = args ?? [],
+            createdAt = (created ?? DateTime.UtcNow).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
+        });
+        File.WriteAllText(file, json, new UTF8Encoding(false));
+        return file;
+    }
+
+    [TestMethod]
+    public void RunsTheProfileInTheFolderAndDeletesTheRequest()
+    {
+        using var h = new Home();
+        var folder = Path.Combine(h.Dir, "odd & %PATH% ^ '$(x) name");
+        Directory.CreateDirectory(folder);
+        var file = Request(h, folder, args: ["--resume", "x y"]);
+        var r = h.ClaudeAs("--launch", file);
+        Assert.AreEqual(0, r.Code, r.All);
+        r.Has("ARGC=2");
+        r.Has("ARG1=[x y]");
+        r.Has($"CLAUDE_CONFIG_DIR={h.Added}");
+        r.Has($"CWD={folder}");
+        r.Hasnt("Press Enter");
+        Assert.IsFalse(File.Exists(file));
+    }
+
+    [TestMethod]
+    public void ANonZeroExitWaitsForEnter()
+    {
+        using var h = new Home();
+        var r = h.Run(h.Wrapper("claude-as"), ["--launch", Request(h, h.Dir)], new() { ["FAKE_EXIT"] = "3" });
+        Assert.AreEqual(3, r.Code);
+        r.Has("Ended with code 3. Press Enter to close.");
+    }
+
+    [TestMethod]
+    public void AMissingFolderStartsNothing()
+    {
+        using var h = new Home();
+        var r = h.ClaudeAs("--launch", Request(h, Path.Combine(h.Dir, "gone")));
+        Assert.AreEqual(1, r.Code);
+        r.Has("Folder not found:");
+        Assert.IsFalse(r.RealRan);
+    }
+
+    [TestMethod]
+    public void ARequestOutsideRunIsRefusedAndKept()
+    {
+        using var h = new Home();
+        var file = Request(h, h.Dir, dir: Path.Combine(h.Dir, "elsewhere"));
+        var r = h.ClaudeAs("--launch", file);
+        Assert.AreEqual(1, r.Code);
+        r.Has("refused a launch request");
+        Assert.IsFalse(r.RealRan);
+        Assert.IsTrue(File.Exists(file));
+    }
+
+    [TestMethod]
+    public void AnOldOrDamagedRequestIsRefusedAndDeleted()
+    {
+        using var h = new Home();
+        var old = Request(h, h.Dir, created: DateTime.UtcNow.AddMinutes(-5));
+        var r = h.ClaudeAs("--launch", old);
+        r.Has("damaged or too old");
+        Assert.IsFalse(r.RealRan);
+        Assert.IsFalse(File.Exists(old));
+        var bad = Path.Combine(h.Root, "run", Guid.NewGuid() + ".launch");
+        File.WriteAllText(bad, "{\"commandName\":1}");
+        r = h.ClaudeAs("--launch", bad);
+        r.Has("damaged or too old");
+        Assert.IsFalse(r.RealRan);
+    }
+
+    [TestMethod]
+    public void TheClaudeAsRulesStillApply()
+    {
+        using var h = new Home();
+        var r = h.ClaudeAs("--launch", Request(h, h.Dir, command: "nope"));
+        r.Has("no profile named 'nope'");
+        Assert.IsFalse(r.RealRan);
+    }
+
+    [TestMethod]
+    public void PlainClaudeTreatsLaunchAsAClaudeArgument()
+    {
+        using var h = new Home();
+        h.Claude("--launch", "x").Has("ARGS=--launch x");
+    }
+
+    [TestMethod]
+    public void SendCtrlCSaysWhyItFailed()
+    {
+        using var h = new Home();
+        var r = h.Claude("--send-ctrl-c", "notapid");
+        Assert.AreEqual(1, r.Code);
+        r.Has("Usage");
+        r = h.Claude("--send-ctrl-c", "4");
+        Assert.AreEqual(1, r.Code);
+        r.Has("Could not reach the console");
     }
 }

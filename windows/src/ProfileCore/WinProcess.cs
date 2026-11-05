@@ -43,6 +43,156 @@ public static class WinProcess
         finally { CloseHandle(h); }
     }
 
+    // ---- Process tree
+
+    const uint TH32CS_SNAPPROCESS = 0x2;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct PROCESSENTRY32W
+    {
+        public uint dwSize, cntUsage, th32ProcessID;
+        public IntPtr th32DefaultHeapID;
+        public uint th32ModuleID, cntThreads, th32ParentProcessID;
+        public int pcPriClassBase;
+        public uint dwFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string szExeFile;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint pid);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool Process32FirstW(IntPtr snap, ref PROCESSENTRY32W e);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool Process32NextW(IntPtr snap, ref PROCESSENTRY32W e);
+
+    /// Every running process: PID, parent PID and exe name.
+    public static List<(int Pid, int Parent, string Name)> Snapshot()
+    {
+        var list = new List<(int, int, string)>();
+        var snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snap == new IntPtr(-1)) return list;
+        try
+        {
+            var e = new PROCESSENTRY32W { dwSize = (uint)Marshal.SizeOf<PROCESSENTRY32W>() };
+            if (!Process32FirstW(snap, ref e)) return list;
+            do list.Add(((int)e.th32ProcessID, (int)e.th32ParentProcessID, e.szExeFile));
+            while (Process32NextW(snap, ref e));
+        }
+        finally { CloseHandle(snap); }
+        return list;
+    }
+
+    // ---- Starting a program in a new console window, with a fresh user environment
+
+    const uint TOKEN_QUERY = 0x0008, TOKEN_DUPLICATE = 0x0002;
+    const uint CREATE_NEW_CONSOLE = 0x00000010, CREATE_UNICODE_ENVIRONMENT = 0x00000400;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct STARTUPINFOW
+    {
+        public uint cb;
+        public IntPtr lpReserved, lpDesktop, lpTitle;
+        public uint dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute, dwFlags;
+        public ushort wShowWindow, cbReserved2;
+        public IntPtr lpReserved2, hStdInput, hStdOutput, hStdError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct PROCESS_INFORMATION { public IntPtr hProcess, hThread; public uint dwProcessId, dwThreadId; }
+
+    [DllImport("kernel32.dll")]
+    static extern IntPtr GetCurrentProcess();
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+
+    [DllImport("userenv.dll", SetLastError = true)]
+    static extern bool CreateEnvironmentBlock(out IntPtr env, IntPtr token, bool inherit);
+
+    [DllImport("userenv.dll", SetLastError = true)]
+    static extern bool DestroyEnvironmentBlock(IntPtr env);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool CreateProcessW(string? app, char[] commandLine, IntPtr pa, IntPtr ta, bool inherit, uint flags,
+                                      IntPtr env, string? cwd, ref STARTUPINFOW si, out PROCESS_INFORMATION pi);
+
+    /// Design flow 2: a new console window, which Windows gives to the default terminal, with the
+    /// environment a program started from the Start menu gets. Nothing is inherited from the caller,
+    /// so a calling Claude Code session's markers never reach the new window. Returns the PID.
+    public static int StartInNewConsole(string commandLine, string workingDir)
+    {
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, out var token))
+            throw new ProfileException($"Could not read this user's token (error {Marshal.GetLastWin32Error()}).");
+        var env = IntPtr.Zero;
+        try
+        {
+            if (!CreateEnvironmentBlock(out env, token, false))
+                throw new ProfileException($"Could not build a fresh environment (error {Marshal.GetLastWin32Error()}).");
+            var si = new STARTUPINFOW { cb = (uint)Marshal.SizeOf<STARTUPINFOW>() };
+            var cmd = (commandLine + "\0").ToCharArray();
+            if (!CreateProcessW(null, cmd, IntPtr.Zero, IntPtr.Zero, false, CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT,
+                                env, workingDir, ref si, out var pi))
+                throw new ProfileException($"Could not open a terminal window (error {Marshal.GetLastWin32Error()}).");
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+            return (int)pi.dwProcessId;
+        }
+        finally
+        {
+            if (env != IntPtr.Zero) DestroyEnvironmentBlock(env);
+            CloseHandle(token);
+        }
+    }
+
+    /// The environment a program started from the Start menu gets, as variables. For programs
+    /// started with ProcessStartInfo, such as VS Code (flow 12), so no caller's markers leak in.
+    public static Dictionary<string, string> FreshEnvironment()
+    {
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, out var token))
+            throw new ProfileException($"Could not read this user's token (error {Marshal.GetLastWin32Error()}).");
+        var env = IntPtr.Zero;
+        try
+        {
+            if (!CreateEnvironmentBlock(out env, token, false))
+                throw new ProfileException($"Could not build a fresh environment (error {Marshal.GetLastWin32Error()}).");
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var p = env;
+            while (true)
+            {
+                var s = Marshal.PtrToStringUni(p);
+                if (string.IsNullOrEmpty(s)) break;
+                var eq = s.IndexOf('=', 1);
+                if (eq > 0) result[s[..eq]] = s[(eq + 1)..];
+                p += (s.Length + 1) * 2;
+            }
+            return result;
+        }
+        finally
+        {
+            if (env != IntPtr.Zero) DestroyEnvironmentBlock(env);
+            CloseHandle(token);
+        }
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool QueryFullProcessImageNameW(IntPtr process, uint flags, char[] name, ref uint size);
+
+    /// The full path of a process's exe, or null if it cannot be read.
+    public static string? ImagePath(int pid)
+    {
+        var h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, (uint)pid);
+        if (h == IntPtr.Zero) return null;
+        try
+        {
+            var buf = new char[32768];
+            var size = (uint)buf.Length;
+            return QueryFullProcessImageNameW(h, 0, buf, ref size) ? new string(buf, 0, (int)size) : null;
+        }
+        finally { CloseHandle(h); }
+    }
+
     // ---- Replacing a file that readers have open
 
     const uint DELETE = 0x00010000, SYNCHRONIZE = 0x00100000;

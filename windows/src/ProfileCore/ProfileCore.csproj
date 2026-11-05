@@ -7,5 +7,6 @@
   <ItemGroup>
     <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
     <InternalsVisibleTo Include="ProfileCore.Tests" />
+    <InternalsVisibleTo Include="ProfileUI.Tests" />
   </ItemGroup>
 </Project>

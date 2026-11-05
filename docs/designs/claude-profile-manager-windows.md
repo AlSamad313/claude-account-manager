@@ -106,7 +106,7 @@ Each decision below says which way it went and why.
     two lines to paste. Windows users expect a setup step to do this, and nothing on Windows matches
     "paste this into your shell file". The risk that made macOS print the lines is handled
     differently: the tool only adds or removes its own one entry, writes the old value to
-    `writes.log` first, and `cpm uninstall` takes the entry out again. Tab completion in PowerShell
+    `writes.log` first, and `cpm uninstall-shell` takes the entry out again. Tab completion in PowerShell
     is a checkbox, off by default, because it means editing the user's own `$PROFILE` file (flow 10).
     Alternative P.
 *   **D2. Stop never forces a session to end.** Same as macOS, which sends SIGINT, then SIGTERM, and
@@ -333,7 +333,8 @@ Code from replacing it.
 
 **Completion.** `bin\claude-profiles.ps1` registers an argument completer for `claude-as` that
 reads names from `names`, as `claude-profiles.zsh` does for zsh. It does nothing if `names` cannot
-be read. The user adds one line to their PowerShell profile to load it (flow 10). Command Prompt has
+be read. If the user ticks the completion checkbox in "Set up command line", one marked line in their
+PowerShell profile loads it (D1, flow 10). Command Prompt has
 no completion. Git Bash is not covered in v1.
 
 ### Flow 2: launching from the app
@@ -366,7 +367,7 @@ The wrapper, in launch mode:
 2. Changes to `folder`. If it is missing: prints "Folder not found: <folder>", waits for Enter, exits 1.
 3. Runs the claude-as rules for commandName and arguments, exactly as flow 1.
 4. When Claude Code exits with code 0: the wrapper exits and the window closes.
-   With any other code: prints "Claude Code ended with code <n>. Press Enter to close." and waits.
+   With any other code: prints "Ended with code <n>. Press Enter to close." and waits.
 ```
 
 Step 4 follows D6. A window closing when its program ends normally is what Windows users expect.
@@ -485,7 +486,9 @@ sent from a process attached to the same console.
 6.   Still alive: report "did not stop" and give the PID. Nothing stronger is sent (D2).
 7.   Ended: list any of the session's child processes, recorded before step 3, that are still
      running, such as a shell command a busy session had started. Show their names and PIDs, and
-     say they were left running. They are never ended by the tool.
+     say they were left running. They are never ended by the tool. "Child processes" includes
+     those on a hidden console a session process owns (bin\claude.exe --console-processes),
+     because Git Bash leaves its commands with no living parent (stage W2 as built).
 8.   Log the result.
 ```
 
@@ -783,6 +786,70 @@ needs them: `UserPath.cs` (for `cpm install-shell`), `LiveSessionReader.cs` (`cp
 a session is live) and a first `RecycleBin.cs` (`cpm discard`, with `SHFileOperation`). `WinProcess.cs`
 holds every Windows call made so far. `cpm` answers the stage W1 commands, plus `uninstall-shell`, and
 names the later stage for the rest.
+
+**Stage W2 as built (2026-11-05).** `cpm list`, `new`, `resume` and `stop` work, and were run against
+real Claude Code sessions in a test folder. Changes from the plan:
+
+*   The wrapper has a third helper mode, `--console-processes <pid>`, for flow 9 step 7. Claude Code
+    runs each command through Git Bash, which starts it by way of a process that exits at once, so
+    a running `sleep` has no living parent and a walk of parent PIDs never finds it. It stays on the
+    hidden console of the `bash.exe` that started it. Step 7 therefore also lists the processes on
+    any console owned by one of the session's processes, through the helper (it attaches, so it
+    must not run in `cpm`). The session's own console is skipped, because the user's shell is on it.
+*   Claude Code writes the status `shell` while a command runs. Stop warns that the command may keep
+    running, as well as the `busy` warning about an unfinished edit.
+*   Flow 2 step 4 prints "Ended with code <n>. Press Enter to close.", because an ownership refusal
+    ends before Claude Code starts.
+*   The `procStart` parser also reads the macOS date string, as flow 4 says.
+*   `scripts/measure-panel.ps1`: 0.1 s for 5,000 transcripts once the files have been read once. The
+    first read of freshly written files took 1.0 to 1.2 s, probably antivirus scanning each new file
+    on first open; not proven.
+
+**Stage W3 as built (2026-11-05).** The tray app, panel and window are built, and pass a build and unit-test
+run. The hands-on E2E parts for the app (1, 2.1, 3, 4.8, 4.9, 5.7, 5.9, 7, 9) have not been run yet. Changes from
+the plan:
+
+*   `src/ProfileUI` holds the shared `AppModel`, the panel, the flow steps and the window. `src/ClaudeProfiles`
+    holds only what is tied to the tray: `App.xaml.cs` (one copy, the signals), `TrayIcon.cs`, `PanelWindow.cs`,
+    `StartupSetting.cs` (also the app's own values and the window's place) and `AppInstall.cs`. The balloon
+    call lives in `TrayIcon.cs`, so there is no `Notifications.cs`.
+*   `build.ps1 -Install` installs the app and no longer runs `cpm install-shell`. The `PATH` change is the
+    user's choice, in the app's "Set up command line" step (D1). The app refreshes `bin\` from its own `tools\`
+    copy when it starts, but only when the shell layer is already installed, and only for files whose bytes
+    differ. It does not compare `bin\VERSION`.
+*   The app has three more modes: `--exit` (asks a running copy to exit; `build.ps1 -Install` uses it before it
+    replaces the files), `--register` and `--uninstall-app`. The startup value runs it with `--background`,
+    which does not open the panel unless the shell layer is missing. `--uninstall-app` deletes the app folder
+    only when the app runs from `%LOCALAPPDATA%\Programs\ClaudeProfiles`.
+*   Starting a second copy passes its right to bring a window to the front to the running copy
+    (`AllowSetForegroundWindow`) before it signals. Without that, the running copy's panel opened without focus
+    and hid itself at once, because it closes on losing focus.
+*   The panel is a fixed 400 × 620, clamped to the work area, in the corner of the work area at the taskbar's
+    tray end. It does not size itself to its content.
+*   The panel and the window both show the current flow step, as on macOS (E2E 7.9). A step is built only in a
+    host that is visible, so the work a step starts when it opens (Doctor, the sign-in check) runs once. A hidden
+    host keeps its step, so text typed in Add profile survives the panel closing.
+*   The lists are replaced only when what they show changed, so the window keeps its selection and focus
+    across the 2-second rechecks.
+*   An unexpected error in the app is shown and written to `logs\writes.log` as an `error` line, and the app
+    keeps running.
+*   The app ID (for the notification's name) is set only when the Start menu shortcut exists. Run from
+    `build\app`, notifications show "ClaudeProfiles".
+*   The published app is self-contained (WPF cannot use Native AOT): 156 MB in 256 files, with only English
+    resources. Its icon is a placeholder drawn by `scripts/make-icon.ps1` (three overlapping profile dots), until the
+    real one is supplied; replacing `src/ClaudeProfiles/app.ico` is enough.
+*   Automated UI tests. `tests/ProfileUI.Tests` renders the real panel, flow steps and window over a
+    temporary home and presses controls through UI Automation (`ViewTests.cs`, one test per E2E step it
+    covers). `AppProcessTests.cs` starts the built `ClaudeProfiles.exe` as a test copy and drives it the
+    same way: first-start panel, Doctor, Add profile, one copy, `--window`, `--exit`, idle CPU. A test copy
+    is one started with `CLAUDE_PROFILES_TEST_INSTANCE=<name>`: its instance names and settings key get
+    that suffix, so it runs beside an installed copy. It cannot register or uninstall, shows no
+    notifications, never changes Start with Windows, and its panel stays open without focus. These tests
+    found that the window failed to open: Click handlers inside the sidebar's item style cannot be
+    connected by WPF, so its right-click menu is now a window resource.
+*   `ClaudeProfiles.exe --window` opens the window, of the running copy if there is one.
+*   Measured on a test home, Debug build: about 0.03 CPU seconds per 10 seconds while hidden, and 171 MB
+    working set. The Release build is measured in E2E 7.11 against the target of under 100 MB.
 
 **Tests to port first.** These carry the rules, so each Swift test has a C# case with the same name:
 the ownership check on `--resume`, a broken `default` stopping plain `claude`, the built-in profile
