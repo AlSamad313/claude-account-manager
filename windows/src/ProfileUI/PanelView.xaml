@@ -1,0 +1,77 @@
+<UserControl x:Class="ProfileUI.PanelView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:ProfileUI">
+    <UserControl.Resources>
+        <ResourceDictionary Source="/ProfileUI;component/Rows.xaml" />
+    </UserControl.Resources>
+    <Grid>
+        <!-- The main list. Flows replace it in place, as on macOS. -->
+        <DockPanel Visibility="{Binding IsMain, Converter={StaticResource Shown}}">
+            <StackPanel DockPanel.Dock="Top" Margin="12,12,12,4">
+                <DockPanel>
+                    <Ellipse Style="{StaticResource Dot}" Fill="{Binding DefaultColor, Converter={StaticResource HexToBrush}}" />
+                    <StackPanel Margin="9,0,0,0">
+                        <TextBlock Text="Claude Profiles" FontWeight="SemiBold" FontSize="14" />
+                        <TextBlock Text="{Binding DefaultLine}" Style="{StaticResource Secondary}" />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+
+            <!-- Bottom bar -->
+            <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" Padding="8">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Exit" Style="{StaticResource Small}" Padding="7,3" Click="Exit" VerticalAlignment="Top" />
+                    <!-- Wraps rather than cutting a button off when Windows makes text larger. -->
+                    <WrapPanel Margin="0,0,0,-4">
+                        <WrapPanel.Resources>
+                            <Style TargetType="Button" BasedOn="{StaticResource Small}">
+                                <Setter Property="Margin" Value="0,0,4,4" />
+                                <Setter Property="Padding" Value="7,3" />
+                            </Style>
+                        </WrapPanel.Resources>
+                        <Button Content="Add profile…" Click="Add" />
+                        <Button Content="Open window…" Click="OpenWindow" />
+                        <Button Content="Copy setup…" Click="CopySetup" />
+                        <Button Content="Doctor" Click="Doctor" />
+                        <Button Content="Guide" Click="Guide" />
+                    </WrapPanel>
+                </DockPanel>
+            </Border>
+
+            <ui:MessageBanners DockPanel.Dock="Top" />
+
+            <Border DockPanel.Dock="Top" Style="{StaticResource Caution}" Visibility="{Binding ShowShellNotice, Converter={StaticResource Shown}}">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Set up" Style="{StaticResource Small}" Click="Shell" VerticalAlignment="Center" />
+                    <TextBlock Style="{StaticResource Wrapped}" Text="Set up command line first. The app starts every session through claude-as." />
+                </DockPanel>
+            </Border>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="6,0">
+                <StackPanel>
+                    <TextBlock Text="PROFILES" Style="{StaticResource SectionTitle}" />
+                    <ItemsControl ItemsSource="{Binding ProfileItems}" ItemTemplate="{StaticResource ProfileRow}" Focusable="False" />
+                    <DockPanel Margin="6,10,6,2">
+                        <TextBlock Text="RECENT SESSIONS" Style="{StaticResource SectionTitle}" Margin="0,0,0,2" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <Grid Margin="6,0,6,4">
+                        <TextBox x:Name="FilterBox" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Filter by title, folder or profile" />
+                        <TextBlock Text="Filter by title, folder or profile" IsHitTestVisible="False" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource Secondary}"
+                                   Visibility="{Binding Filter, Converter={StaticResource Shown}, ConverterParameter=Invert}" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding PanelSessions}" ItemTemplate="{StaticResource SessionRow}" Focusable="False" />
+                    <TextBlock Text="{Binding PanelEmptyText}" Style="{StaticResource Secondary}" Margin="6,6"
+                               Visibility="{Binding PanelEmpty, Converter={StaticResource Shown}}" />
+                    <TextBlock Margin="6,6" FontSize="12">
+                        <Hyperlink Click="OpenWindow">All sessions…</Hyperlink>
+                    </TextBlock>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsFlow, Converter={StaticResource Shown}}">
+            <ui:FlowView />
+        </ScrollViewer>
+    </Grid>
+</UserControl>

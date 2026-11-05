@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>ProfileUI</RootNamespace>
+    <!-- Dates and times in the user's own format. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ProfileCore\ProfileCore.csproj" />
+    <InternalsVisibleTo Include="ProfileUI.Tests" />
+    <!-- Shared with macOS, so a new mask reaches both. -->
+    <Resource Include="..\..\..\Resources\BurstMask.png" Link="BurstMask.png" />
+  </ItemGroup>
+</Project>

@@ -20,8 +20,79 @@ internal static partial class Program
     static int Main(string[] args)
     {
         if (args.Length >= 1 && args[0] == "--profile-label") return ProfileLabel(args.Length > 1 ? args[1] : "");
+        if (args is ["--send-ctrl-c", var pidText])
+        {
+            if (!uint.TryParse(pidText, out var pid)) { Err("Usage: claude --send-ctrl-c <pid>"); return 1; }
+            var why = ConsoleControl.SendCtrlC(pid);
+            if (why != null) Err(why);
+            return why == null ? 0 : 1;
+        }
+        if (args is ["--console-processes", var conText])
+        {
+            if (!uint.TryParse(conText, out var pid)) { Err("Usage: claude --console-processes <pid>"); return 1; }
+            var (pids, error) = ConsoleControl.ConsoleMembers(pid);
+            if (error != null) { Err(error); return 1; }
+            Console.Out.Write(string.Concat(pids.Select(p => p + "\n")));
+            Console.Out.Flush();
+            return 0;
+        }
         var me = Path.GetFileNameWithoutExtension(Environment.ProcessPath ?? "claude");
-        return me.Equals("claude-as", StringComparison.OrdinalIgnoreCase) ? MainClaudeAs(args) : MainClaude(args);
+        var asMode = me.Equals("claude-as", StringComparison.OrdinalIgnoreCase);
+        if (asMode && args is ["--launch", var file]) return LaunchFromRequest(file);
+        return asMode ? MainClaudeAs(args) : MainClaude(args);
+    }
+
+    /// Design flow 2: a window the app or cpm opened. On a normal exit the window closes; on any
+    /// other, the message stays until Enter, so a refusal or a failed sign-in is never lost (D6).
+    static int LaunchFromRequest(string file)
+    {
+        ConsoleControl.IgnoreCtrlC();
+        var code = RunRequest(file);
+        if (code != 0)
+        {
+            Err($"Ended with code {code}. Press Enter to close.");
+            try { Console.ReadLine(); } catch (IOException) { }
+        }
+        return code;
+    }
+
+    static int RunRequest(string file)
+    {
+        var full = Path.GetFullPath(file);
+        var runDir = Path.Combine(Root, "run");
+        if (!full.EndsWith(LaunchRequest.Extension, StringComparison.OrdinalIgnoreCase) ||
+            !PathCanon.Same(PathCanon.Canonical(Path.GetDirectoryName(full)!), PathCanon.Canonical(runDir)))
+        {
+            Err($"claude-profiles: refused a launch request that is not in {runDir}.");
+            return 1;
+        }
+        byte[] bytes;
+        DateTime written;
+        try
+        {
+            written = File.GetLastWriteTimeUtc(full);
+            bytes = File.ReadAllBytes(full);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Err($"claude-profiles: cannot read the launch request: {e.Message}");
+            return 1;
+        }
+        try { File.Delete(full); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        var req = LaunchRequest.Parse(bytes);
+        var now = DateTime.UtcNow;
+        if (req == null || (now - written).Duration() > LaunchRequest.MaxAge || (now - req.CreatedAt).Duration() > LaunchRequest.MaxAge)
+        {
+            Err("claude-profiles: the launch request is damaged or too old. Nothing was started.");
+            return 1;
+        }
+        if (!Directory.Exists(req.Folder))
+        {
+            Err($"Folder not found: {req.Folder}");
+            return 1;
+        }
+        Environment.CurrentDirectory = req.Folder;
+        return MainClaudeAs([req.CommandName, .. req.Arguments]);
     }
 
     static int MainClaude(string[] args)

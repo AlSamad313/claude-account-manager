@@ -26,7 +26,7 @@ Manager names with `claude` or `anthropic` at that time: none.
 | C7 | **Pass** | One Ctrl+C ended every session within 2.6 s, exit code 0, in Windows Terminal and in a classic console, idle and busy. A busy session's running command outlives it. Details below |
 | C8 | **Pass** | Title held in all 4 runs, including with a tool running. Control without the variable: Claude Code renamed the tab |
 | C9 | **Pass so far** | Both live records matched to 0.000 s, including a desktop app one, and every test session since. An elevated session needs a UAC click and was not run; the design handles access denied either way |
-| C10 | Partly | `cli`, `claude-desktop`, and `sdk-cli` for `claude -p`. `status`: `busy`, `idle`. VS Code and Cowork still to see |
+| C10 | Partly | `cli`, `claude-desktop`, and `sdk-cli` for `claude -p`. `status`: `busy`, `idle`, and `shell` while a command runs (stage W2). VS Code and Cowork still to see |
 | C11 | **Pass** | Git Bash runs the status line command. A quoted Windows path with a space works, and colour codes show. Details below |
 | C12 | **Partly** | With the bin folder first in `PATH`, PowerShell 5, Command Prompt and Git Bash (plain and login) all find the wrapper. Writing the real user `PATH` was not done yet, so new windows, the Run dialog and `claude update` are still to see. No PowerShell 7 or VS Code on this PC. Baseline below |
 | C13 | **Done** | Details below |
@@ -172,6 +172,32 @@ added 12.2 ms (14 ms direct, 26 ms wrapped). Both are well under the 50 ms limit
   `build.ps1` adds the Visual Studio Installer folder to its own `PATH`.
 - **Windows PowerShell 5.1 drops embedded quotes when it calls a native program.** This affects only test scripts, not
   the product, which quotes with `ProcessStartInfo.ArgumentList`.
+
+## Found while building stage W2
+
+Run on 2026-11-05 in a test home (`.cpm-s0\20\home`) whose added profile used signed-in test folder 1. The real
+`.claude-profiles` and `~\.claude` were not touched.
+
+| What | Result |
+| --- | --- |
+| Fresh environment for a new window (flow 2) | A window started with `CreateEnvironmentBlock(inherit: false)` from inside a Claude Code session had none of its `CLAUDE_CODE_*` variables, nor a marker variable set just before. It had the user's `PATH` and `USERPROFILE` |
+| `claude-as --launch` | Deleted the request at once, ran Claude Code as its child in the request's folder, and exited 0 when Claude Code ended, so the window closed. A `--resume` for another profile's session was refused before Claude Code started, and the window stayed open for Enter |
+| `cpm list --live` | Showed the new session within 5 to 10 s, as `running busy` while it worked |
+| `cpm resume` on a live session | Refused, with the PID. After a stop, the same request with `--resume` reopened that session ID in its folder |
+| `cpm stop` | One Ctrl+C through the helper ended the session in 2.2 s, idle or busy, 5 times. With no terminal to confirm on, it refused without `--yes`. A second stop said "not running" |
+| A command the session left running | A busy session's `sleep 90` survived the stop each time, as in C7. Found only through its console (below), then reported by name and PID and left alone |
+
+- **Git Bash commands have no living parent.** Claude Code → `bash.exe` (no console) → `bash.exe` (its own hidden
+  console) → a process that exits at once → `sleep.exe`. A walk of parent PIDs therefore never reaches the command.
+  It stays attached to that hidden console, so Stop also lists the processes on consoles owned by the session's
+  processes, through a new helper mode, `claude.exe --console-processes <pid>`. Test:
+  `FindsACommandWhoseParentHasExitedThroughItsConsole`, which builds the same shape with `cmd /c start /b`.
+- **Claude Code has a third status, `shell`,** seen while a command ran (C10 had seen only `busy` and `idle`). Stop
+  warns that the command may keep running.
+- **Performance.** `scripts/measure-panel.ps1`, 10 profiles and 5,000 transcripts: 0.08 to 0.11 s once the files had
+  been read once. The first read of the freshly written files took 1.0 to 1.2 s on each of 3 tries, over the 1 s
+  target; starting `cpm` alone takes 0.09 s. The likely cause is antivirus scanning each new file on first open, which
+  real transcripts get as they are written. Not proven; the tray app (W3) keeps its cache, so it pays this once.
 
 ## C13: file-format key names
 

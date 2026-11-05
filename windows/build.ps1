@@ -3,10 +3,12 @@
   Builds the Windows version of Claude Profiles.
 
 .DESCRIPTION
-  build.ps1            build cpm.exe and the claude.exe wrapper into build\bin, with Native AOT
+  build.ps1            build cpm.exe and the claude.exe wrapper into build\bin, with Native AOT, and the
+                       tray app into build\app (self-contained, with its own copy of bin in app\tools)
   build.ps1 -Test      also run the tests
-  build.ps1 -Install   also install them: cpm install-shell (copies to %USERPROFILE%\.claude-profiles\bin
-                       and puts that folder first in your user PATH)
+  build.ps1 -Install   also install the app in %LOCALAPPDATA%\Programs\ClaudeProfiles, with a Start menu
+                       shortcut, an Installed apps entry and Start with Windows, then start it. The
+                       app's "Set up command line" step puts .claude-profiles\bin first in your user PATH.
 
   Needs the .NET 10 SDK and the Visual Studio Build Tools with "Desktop development with C++".
   Scripts are blocked by default on Windows, so run it as:
@@ -57,14 +59,39 @@ function Publish($project, $dir) {
 Write-Host 'Building cpm.exe and claude.exe...'
 Publish 'src\Wrapper\Wrapper.csproj' 'bin'
 Publish 'src\Cpm\Cpm.csproj' 'bin'
+Copy-Item (Join-Path $here 'src\Shell\claude-profiles.ps1') (Join-Path $out 'bin') -Force
 Get-ChildItem (Join-Path $out 'bin') -Filter *.pdb | Remove-Item
 Write-Host "Built into $out\bin"
+
+# WPF cannot be compiled with Native AOT. Self-contained, so no .NET runtime needs to be installed.
+Write-Host 'Building ClaudeProfiles.exe...'
+$app = Join-Path $out 'app'
+if (Test-Path $app) {
+    # A copy started from build\app holds its files open. Ask it to exit first. Only that copy: --exit
+    # reaches whichever copy is running, and an installed one does not hold these files.
+    $old = Join-Path $app 'ClaudeProfiles.exe'
+    $fromHere = Get-Process ClaudeProfiles -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith("$app\", [StringComparison]::OrdinalIgnoreCase) }
+    if ((Test-Path $old) -and $fromHere) {
+        $p = Start-Process $old -ArgumentList '--exit' -Wait -PassThru
+        if ($p.ExitCode -ne 0) { Fail 'Claude Profiles is still running. Exit it from its tray menu, then run this again.' }
+        Start-Sleep -Milliseconds 500
+    }
+    Remove-Item $app -Recurse -Force
+}
+& $dotnet publish (Join-Path $here 'src\ClaudeProfiles\ClaudeProfiles.csproj') -c Release -r win-x64 --self-contained true -o $app --nologo -v quiet
+if ($LASTEXITCODE -ne 0) { Fail 'Build failed: ClaudeProfiles' }
+Get-ChildItem $app -Filter *.pdb | Remove-Item
+# The app refreshes .claude-profiles\bin from this copy when it starts (flow 10, upgrade).
+$tools = Join-Path $app 'tools'
+New-Item -ItemType Directory -Force $tools | Out-Null
+foreach ($f in 'cpm.exe', 'claude.exe', 'claude-profiles.ps1') { Copy-Item (Join-Path $out "bin\$f") $tools }
+Write-Host "Built into $app"
 
 if ($Test) {
     Write-Host 'Running tests...'
     Publish 'tests\FakeClaude\FakeClaude.csproj' 'fake'
     $failed = $false
-    foreach ($t in 'tests\ProfileCore.Tests\ProfileCore.Tests.csproj', 'tests\Wrapper.Tests\Wrapper.Tests.csproj') {
+    foreach ($t in 'tests\ProfileCore.Tests\ProfileCore.Tests.csproj', 'tests\Wrapper.Tests\Wrapper.Tests.csproj', 'tests\ProfileUI.Tests\ProfileUI.Tests.csproj') {
         & $dotnet test --project (Join-Path $here $t)
         if ($LASTEXITCODE -ne 0) { $failed = $true }
     }
@@ -73,8 +100,19 @@ if ($Test) {
 }
 
 if ($Install) {
-    & (Join-Path $out 'bin\cpm.exe') install-shell
-    if ($LASTEXITCODE -ne 0) { Fail 'Install failed.' }
+    $dest = Join-Path $env:LOCALAPPDATA 'Programs\ClaudeProfiles'
+    $exe = Join-Path $dest 'ClaudeProfiles.exe'
+    if (Test-Path $exe) {
+        $p = Start-Process $exe -ArgumentList '--exit' -Wait -PassThru
+        if ($p.ExitCode -ne 0) { Fail 'Claude Profiles is still running. Exit it from its tray menu, then run this again.' }
+    }
+    # /MIR makes the folder an exact copy, so files of an older version do not stay behind.
+    robocopy $app $dest /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { Fail "Could not copy the app to $dest" }
+    $p = Start-Process $exe -ArgumentList '--register' -Wait -PassThru
+    if ($p.ExitCode -ne 0) { Fail 'Could not register the app.' }
+    Start-Process $exe
+    Write-Host "Installed in $dest and started. Look for its icon by the clock."
 }
 
 Pop-Location
