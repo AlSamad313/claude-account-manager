@@ -17,7 +17,7 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first. The **safety rules** th
 |---|---|---|
 | Code | `Sources/`, `shell/`, `Tests/`, `ShellTests/` | `windows/` |
 | Language | Swift and zsh | C# on .NET 10 |
-| Status | Working | In progress, see [windows/README.md](windows/README.md) |
+| Status | Working | Every stage built, hands-on testing in progress; see [windows/README.md](windows/README.md) |
 | Design | [claude-profile-manager.md](docs/designs/claude-profile-manager.md) | [claude-profile-manager-windows.md](docs/designs/claude-profile-manager-windows.md), which lists only the differences |
 
 The two share no code, but they share the same features and safety rules. If you change behaviour on one platform, say in your pull request whether the other needs the same change, and open an issue if it does. You only need to build and test the platform you changed: CI runs both on every pull request.
@@ -108,7 +108,8 @@ If an AI tool helped write your change, that's fine. You're still responsible fo
 
 These are open if you want them. Please open an issue to claim one.
 
-- Windows: listing and stopping sessions, the tray app, Copy setup and profile removal (stages W2 to W5 in the [Windows design](docs/designs/claude-profile-manager-windows.md))
+- Windows: working through the [hands-on checklist](docs/E2E-checklist-windows.md) on more PCs, and reporting what differs
+- Windows: a signed installer, so SmartScreen and Smart App Control don't warn
 - Support for terminals other than Terminal.app, such as iTerm2
 - An option to start the app at login
 - A signed and notarized release, or a Homebrew cask, so the macOS warning goes away
