@@ -17,6 +17,7 @@ public sealed class AppEnvironment
     public required SessionStopper Stopper { get; init; }
     public required Doctor Doctor { get; init; }
     public required ShellInstaller Installer { get; init; }
+    public required SetupCopier Copier { get; init; }
     /// The app's own copy of the bin files. Null when there is none, as in tests.
     public string? ShellSource { get; init; }
 
@@ -27,7 +28,8 @@ public sealed class AppEnvironment
         return new AppEnvironment
         {
             Store = store, Login = new LoginCoordinator(store), Launcher = new Launcher(store), Index = new SessionIndex(locator),
-            Stopper = new SessionStopper(locator), Doctor = new Doctor(locator), Installer = new ShellInstaller(store), ShellSource = shellSource,
+            Stopper = new SessionStopper(locator), Doctor = new Doctor(locator), Installer = new ShellInstaller(store), Copier = new SetupCopier(store),
+            ShellSource = shellSource,
         };
     }
 }
@@ -41,6 +43,7 @@ public abstract record Route
     public sealed record Doctor : Route;
     public sealed record Shell : Route;
     public sealed record Stop(string SessionId) : Route;
+    public sealed record Copy : Route;
 
     public static readonly Route Home = new Main();
 }
@@ -542,6 +545,109 @@ public sealed class AppModel(AppEnvironment env) : INotifyPropertyChanged
         if (r != null) DoctorReport = r;
         Raise(nameof(DoctorRunning));
         Raise(nameof(DoctorReport));
+    }
+
+    // ---- Copy setup (design flow 6). Nothing is written until ApplyCopy.
+
+    public CopyPlan? CopyPlan { get; private set; }
+    public ApplyResult? CopyResult { get; private set; }
+    public RestoreResult? RestoreResult { get; private set; }
+    public bool CopyBusy { get; private set; }
+    public IReadOnlyList<BackupInfo> Backups { get; private set; } = [];
+
+    public IReadOnlyList<Profile> CopySources => Profiles.Where(p => p.State == ProfileState.Ready).ToList();
+    /// The built-in profile is never a target.
+    public IReadOnlyList<Profile> CopyTargets => Profiles.Where(p => !p.Builtin && p.State == ProfileState.Ready).ToList();
+
+    /// Which profile "To" should hold once "From" changes: the current one if it is still valid,
+    /// otherwise the first valid one, or none.
+    public static string? CopyTarget(string? source, string? current, IEnumerable<Profile> targets)
+    {
+        var valid = targets.Where(t => t.Id != source).Select(t => t.Id).ToList();
+        return current != null && valid.Contains(current) ? current : valid.FirstOrDefault();
+    }
+
+    /// The built-in profile if it is signed in, as it usually holds the setup to copy.
+    public string? DefaultCopySource() =>
+        CopySources.FirstOrDefault(p => p.Builtin)?.Id ?? CopySources.FirstOrDefault()?.Id;
+
+    void RaiseCopy()
+    {
+        foreach (var n in new[] { nameof(CopyPlan), nameof(CopyResult), nameof(RestoreResult), nameof(CopyBusy), nameof(Backups) }) Raise(n);
+    }
+
+    /// The view changed a tick or a conflict choice.
+    public void CopyPlanEdited() => Raise(nameof(CopyPlan));
+
+    public async Task PreparePreview(string? sourceId, string? targetId, bool keepResult = false)
+    {
+        if (!keepResult) { CopyResult = null; RestoreResult = null; }
+        var source = sourceId == null ? null : ProfileById(sourceId);
+        var target = targetId == null ? null : ProfileById(targetId);
+        if (source == null || target == null || source.Id == target.Id)
+        {
+            CopyPlan = null;
+            RaiseCopy();
+            return;
+        }
+        var (r, e) = await Run(() => (Plan: env.Copier.Plan(source, target), List: env.Copier.Backups.List(target.Id)));
+        if (e != null)
+        {
+            CopyPlan = null;
+            ErrorText = Message(e);
+        }
+        else
+        {
+            CopyPlan = r.Plan;
+            Backups = r.List;
+            ErrorText = null;
+        }
+        RaiseCopy();
+    }
+
+    public async Task ApplyCopy()
+    {
+        if (CopyPlan is not { } plan || CopyBusy) return;
+        CopyBusy = true;
+        RestoreResult = null;
+        RaiseCopy();
+        var (r, e) = await Run(() => env.Copier.Apply(plan));
+        CopyBusy = false;
+        if (e != null) ErrorText = Message(e);
+        else
+        {
+            CopyResult = r;
+            ErrorText = null;
+        }
+        RaiseCopy();
+        await PreparePreview(plan.SourceId, plan.TargetId, keepResult: true);
+    }
+
+    public async Task RestoreBackup(string backupId, string targetId, string? sourceId)
+    {
+        if (ProfileById(targetId) is not { } target) return;
+        CopyBusy = true;
+        CopyResult = null;
+        RaiseCopy();
+        var (r, e) = await Run(() => env.Copier.Restore(target, backupId));
+        CopyBusy = false;
+        if (e != null) ErrorText = Message(e);
+        else
+        {
+            RestoreResult = r;
+            ErrorText = null;
+        }
+        RaiseCopy();
+        await PreparePreview(sourceId, targetId, keepResult: true);
+    }
+
+    public void ClearCopy()
+    {
+        CopyPlan = null;
+        CopyResult = null;
+        RestoreResult = null;
+        Backups = [];
+        RaiseCopy();
     }
 
     public async Task FixAndRerunDoctor()

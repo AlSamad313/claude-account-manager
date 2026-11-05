@@ -71,6 +71,7 @@
                     <Menu DockPanel.Dock="Right" Background="Transparent" VerticalAlignment="Center" Margin="6,0,0,0">
                         <MenuItem Header="More" Padding="8,4">
                             <MenuItem Header="Set up command line…" Click="Shell" />
+                            <MenuItem Header="Copy setup…" Click="CopySetup" />
                             <MenuItem Header="Doctor" Click="Doctor" />
                             <MenuItem Header="Refresh" InputGestureText="F5" Click="RefreshClick" />
                         </MenuItem>

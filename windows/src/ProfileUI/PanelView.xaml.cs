@@ -22,6 +22,7 @@ public partial class PanelView : UserControl
     void Add(object sender, RoutedEventArgs e) => Go(new Route.Add());
     void Shell(object sender, RoutedEventArgs e) => Go(new Route.Shell());
     void Doctor(object sender, RoutedEventArgs e) => Go(new Route.Doctor());
+    void CopySetup(object sender, RoutedEventArgs e) => Go(new Route.Copy());
     void OpenWindow(object sender, RoutedEventArgs e) => OpenWindowRequested?.Invoke();
     void Exit(object sender, RoutedEventArgs e) => ExitRequested?.Invoke();
 }

@@ -49,6 +49,7 @@ public sealed class FlowView : ContentControl
             Route.Doctor => new DoctorView(),
             Route.Shell => new ShellSetupView(),
             Route.Stop s => new StopView(s.SessionId),
+            Route.Copy => new CopySetupView(),
             _ => null,
         };
         if (Content is FrameworkElement f)

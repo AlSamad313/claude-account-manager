@@ -67,9 +67,11 @@ Write-Host "Built into $out\bin"
 Write-Host 'Building ClaudeProfiles.exe...'
 $app = Join-Path $out 'app'
 if (Test-Path $app) {
-    # A copy started from build\app holds its files open. Ask it to exit first.
+    # A copy started from build\app holds its files open. Ask it to exit first. Only that copy: --exit
+    # reaches whichever copy is running, and an installed one does not hold these files.
     $old = Join-Path $app 'ClaudeProfiles.exe'
-    if ((Test-Path $old) -and (Get-Process ClaudeProfiles -ErrorAction SilentlyContinue)) {
+    $fromHere = Get-Process ClaudeProfiles -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith("$app\", [StringComparison]::OrdinalIgnoreCase) }
+    if ((Test-Path $old) -and $fromHere) {
         $p = Start-Process $old -ArgumentList '--exit' -Wait -PassThru
         if ($p.ExitCode -ne 0) { Fail 'Claude Profiles is still running. Exit it from its tray menu, then run this again.' }
         Start-Sleep -Milliseconds 500

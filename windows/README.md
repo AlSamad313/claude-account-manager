@@ -3,9 +3,9 @@
 The Windows version of Claude Profiles: several Claude Code accounts side by side, each in its own
 `CLAUDE_CONFIG_DIR` folder. The design is `../docs/designs/claude-profile-manager-windows.md`.
 
-**Status: stage W3.** The tray app and its window, `cpm` (add, keep, retry, discard, default, list, new,
+**Status: stage W4.** The tray app and its window, with Copy setup, `cpm` (add, keep, retry, discard, default, list, new,
 resume, stop, code, doctor, install-shell, uninstall-shell) and the `claude` / `claude-as` wrapper work.
-Copy setup (W4) and removal (W5) are still to come.
+Removing a profile, and uninstalling (W5), are still to come.
 
 ## Requirements
 
@@ -53,7 +53,7 @@ Apps > Installed apps > Claude Profiles > Uninstall. Neither touches your profil
 ## Layout
 
 ```text
-src/ProfileCore/     the rules: profiles, sign-in, sessions, stop, doctor, install (class library)
+src/ProfileCore/     the rules: profiles, sign-in, sessions, stop, copy setup, doctor, install (class library)
 src/Shared/          the names reader, real-binary rule and launch request, compiled into ProfileCore and the wrapper
 src/Wrapper/         claude.exe / claude-as.exe (Native AOT); never reads JSON
 src/Cpm/             cpm.exe (Native AOT)

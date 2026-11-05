@@ -62,8 +62,8 @@ see the notice, and in 2.1 the result says the folder was already first in `PATH
       "Claude Profiles — plain claude uses" and the built-in profile's name. The panel has no taskbar button.
 - [ ] **1.3 The panel** opened by itself above the tray. If not, left-click the dot. **Expect:** the title "Claude
       Profiles", "plain claude uses" and the built-in profile's name, and a "Filter by title, folder or profile"
-      field. Also a "Set up command line first" notice, and the footer buttons Add profile…, Open window…, Doctor and
-      Exit. (Copy setup… comes in stage W4.)
+      field. Also a "Set up command line first" notice, and the footer buttons Add profile…, Open window…, Copy setup…,
+      Doctor and Exit, all on one row.
 - [ ] **1.4 Look at the drawing.** The filter field takes typing, and the "⋯" menu opens. Nothing overlaps, is cut off
       or is unreadable, in light mode and in dark mode (Settings > Personalization > Colors). **Expect:** Esc closes the
       panel, and so does clicking somewhere else. Clicking the dot while the panel is open closes it.
@@ -73,7 +73,8 @@ see the notice, and in 2.1 the result says the folder was already first in `PATH
 - [ ] **1.7 New Terminal is off.** **Expect:** it can't be clicked on any row.
 - [ ] **1.8 Add profile… before setup.** **Expect:** a note to set up the command line first, and Continue to sign-in
       can't be clicked. Press Cancel.
-- [ ] **1.9** Stage W4 (Copy setup…).
+- [ ] **1.9 Copy setup… with nothing to copy into.** **Expect:** "Add and sign in to another profile first. The
+      built-in profile can be copied from, never into." Press Done.
 - [ ] **1.10 Doctor.** **Expect:** your built-in account shows as signed in, and a fault says plain `claude` doesn't run
       the wrapper. Press Done.
 - [ ] **1.11 Only one copy** (Windows only). Open the Start menu and start Claude Profiles again. **Expect:** no second
@@ -374,7 +375,81 @@ This is the step most likely to feel broken, so watch it closely.
 
 ## Part 8: Copy setup
 
-Stage W4.
+Exit every WRP and Test session first. Variables for this part, in one PowerShell window that you keep open:
+
+```powershell
+function Dir-Of($c) { (Get-Content $HOME\.claude-profiles\names | Where-Object { $_.StartsWith("$c`t") }).Split("`t")[4] }
+$W = Dir-Of wrp; $T = Dir-Of test
+$W; $T
+```
+
+- [ ] **8.1 The list.** Panel: Copy setup…. **Expect:** From is Personal and To is WRP. Group headings (MCP SERVERS,
+      SETTINGS, SKILLS…, PLUGINS) and Add, Change or Same on each row. An MCP server with `env` values is unticked,
+      with a warning that it may contain a secret and that other programs can read it while it is being added. **No
+      `skills\synced`.** The To list never offers Personal. Nothing is cut off, in light and dark mode.
+- [ ] **8.2 Secrets are masked.** Tick a server that has `env` values. **Expect:** `Include env.… = ••••••` rows, each
+      unticked, and no real value anywhere.
+- [ ] **8.3 Nothing ticked.** Untick everything. **Expect:** the Copy button is off.
+- [ ] **8.4 Refused while live.** Start `claude-as wrp` in another window. In the app, switch To to Test and back to
+      WRP. **Expect:** "WRP has a live session", and Copy is off. `/exit`, switch To away and back. **Expect:** the
+      message clears.
+- [ ] **8.5 Copy a small set.** Tick only one skill, one plugin if you have any, and one server that has secrets, with
+      its secrets unticked. Copy. **Expect:** "Copied 3 items." (fewer if you have no plugin), a backup note, and
+      `claude-as wrp …` commands to remove the plugin and the server. Copy those commands somewhere.
+- [ ] **8.6 It worked.**
+
+  ```powershell
+  Get-ChildItem "$W\skills"
+  claude-as wrp plugin list
+  claude-as wrp mcp list
+  Get-FileHash $HOME\.claude\settings.json
+  ```
+
+  **Expect:** the skill, the plugin and the server, with no secret values in `claude-as wrp mcp get <name>`. The hash
+  matches 0.3, unless you changed your settings yourself.
+- [ ] **8.7 In a real session.** `claude-as wrp`. **Expect:** the status line still shows `● WRP`. Ask `Which skills
+      can you see?` **Expect:** the copied one is listed. `/exit`.
+- [ ] **8.8 A ticked secret, with a fake value:**
+
+  ```powershell
+  claude-as test mcp add sectest --scope user -e TOKEN=fake123 -- cmd /c echo hi
+  ```
+
+  Copy from Test to WRP with `sectest` and its `env.TOKEN` ticked. Then `claude-as wrp mcp get sectest`. **Expect:**
+  it has TOKEN.
+- [ ] **8.9 Changing an MCP server:**
+
+  ```powershell
+  claude-as wrp mcp add copytest --scope user -- cmd /c echo one
+  claude-as test mcp add copytest --scope user -- cmd /c echo two
+  ```
+
+  Copy from WRP to Test. **Expect:** `copytest` shows Change. Tick it and copy. `claude-as test mcp get copytest`
+  shows `one`.
+- [ ] **8.10 Skip, Overwrite, Rename:**
+
+  ```powershell
+  Set-Content "$W\CLAUDE.md" one; Set-Content "$T\CLAUDE.md" two
+  ```
+
+  Copy from WRP to Test, with `CLAUDE.md` ticked. **Expect:** a Change badge and "If it exists:" with Skip,
+  Overwrite and Rename. Do this three times, checking after each with `Get-ChildItem $T -Filter CLAUDE*; Get-Content "$T\CLAUDE.md"`:
+  **Rename** gives `CLAUDE-copy.md` and leaves `two`. **Skip** changes nothing. **Overwrite** gives `one`.
+- [ ] **8.11 Changed after the preview.** Open the preview with `CLAUDE.md` ticked as a Change, in the window so it
+      stays open. In PowerShell, `Set-Content "$T\CLAUDE.md" three`. Press Copy. **Expect:** "changed since the
+      preview. Nothing was copied", and `three` is still there.
+- [ ] **8.12 Restore, and later work.** Run `Remove-Item "$T\CLAUDE-copy.md"; Set-Content "$T\CLAUDE.md" base;
+      Set-Content "$W\CLAUDE.md" new`, and copy from WRP to Test with Overwrite. Then `Set-Content "$T\CLAUDE.md" edited`.
+      Press Restore… and choose the newest. **Expect:** it lists `CLAUDE.md` as left alone, and `edited` is still there.
+- [ ] **8.13 Read-only comes back** (Windows only). `Set-Content "$T\CLAUDE.md" base; Set-ItemProperty "$T\CLAUDE.md"
+      IsReadOnly $true`. Copy from WRP to Test with Overwrite. **Expect:** it copies. Restore… the newest. **Expect:**
+      `Get-Content "$T\CLAUDE.md"` says `base` and `(Get-Item "$T\CLAUDE.md").IsReadOnly` is `True`. Then
+      `Set-ItemProperty "$T\CLAUDE.md" IsReadOnly $false`.
+- [ ] **8.14 Restore undoes what's unchanged.** From Personal, To WRP, Restore… and pick the backup from 8.5.
+      **Expect:** the skill is gone from `$W\skills`, and it shows the commands for what it can't undo.
+- [ ] **8.15 The plugin and the server.** Run the commands you saved in 8.5, then `claude-as wrp plugin list` and
+      `claude-as wrp mcp list`. **Expect:** both have gone. Also run `claude-as test mcp remove sectest --scope user`,
+      `claude-as wrp mcp remove sectest --scope user`, and the same for `copytest` in both.
 
 ## Part 9: Reboot
 

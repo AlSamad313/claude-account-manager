@@ -156,7 +156,7 @@ parts and order, so the two can be compared.
 | macOS | Windows |
 | --- | --- |
 | Coloured dot in the menu bar, in the default profile's colour; no Dock icon | Coloured dot in the notification area, in the default profile's colour. Hovering shows "Claude Profiles — plain claude uses <name>". The panel has no taskbar button. Windows first puts new icons in the overflow (^) area; the first-run notification says how to pin it |
-| Click the dot: a 400-point-wide panel | Left-click the dot: the same panel, 400 px wide, above the tray like the Wi-Fi flyout (D7). It closes on Esc or when it loses focus. Right-click shows the usual tray menu: Open Claude Profiles, Start with Windows (tick), Exit |
+| Click the dot: a 400-point-wide panel | Left-click the dot: the same panel, 440 px wide so its footer fits, above the tray like the Wi-Fi flyout (D7). It closes on Esc or when it loses focus. Right-click shows the usual tray menu: Open Claude Profiles, Start with Windows (tick), Exit |
 | Panel: "Claude Profiles", "plain claude uses <name>", "Filter by title, folder or profile", "Set up shell first" notice, profile rows, session rows, footer Add profile…, Open window…, Copy setup…, Doctor, Quit | The same text and order, with Windows words: "Set up command line" instead of "Set up shell", Exit instead of Quit |
 | No sign-in alert; the step shows when you open the panel | A Windows notification when a sign-in is seen; clicking it opens that step (D8) |
 | Light or dark from macOS | Light or dark and accent colour from Windows (D7) |
@@ -824,7 +824,7 @@ the plan:
 *   Starting a second copy passes its right to bring a window to the front to the running copy
     (`AllowSetForegroundWindow`) before it signals. Without that, the running copy's panel opened without focus
     and hid itself at once, because it closes on losing focus.
-*   The panel is a fixed 400 × 620, clamped to the work area, in the corner of the work area at the taskbar's
+*   The panel is a fixed 440 × 620 (400 wide until W4), clamped to the work area, in the corner of the work area at the taskbar's
     tray end. It does not size itself to its content.
 *   The panel and the window both show the current flow step, as on macOS (E2E 7.9). A step is built only in a
     host that is visible, so the work a step starts when it opens (Doctor, the sign-in check) runs once. A hidden
@@ -850,6 +850,36 @@ the plan:
 *   `ClaudeProfiles.exe --window` opens the window, of the running copy if there is one.
 *   Measured on a test home, Debug build: about 0.03 CPU seconds per 10 seconds while hidden, and 171 MB
     working set. The Release build is measured in E2E 7.11 against the target of under 100 MB.
+
+**Stage W4 as built (2026-11-05).** Copy setup works from the panel (footer Copy setup…) and the window
+(More > Copy setup…), with the macOS table, defaults, wording and two steps. `ProfileCore/SetupCopier/`
+is a port of the Swift files, and its tests are the Swift tests, case for case. Changes from macOS:
+
+*   The JSON files are read and written as plain trees (`JsonTree`, over `System.Text.Json.Nodes`), so
+    unknown keys survive and `cpm` still compiles ahead of time. A written `settings.json` has its keys
+    sorted, as the Swift encoder writes it.
+*   "Points into the source profile's folder" looks at every string in the server's command and
+    arguments, or in the new hooks. It matches with either slash and in any case. It also matches the 8.3
+    short form at every level, such as a short home folder with a long `.claude` after it, and `~`,
+    `%USERPROFILE%`, `$env:USERPROFILE` and `$HOME` forms. The folder name must end where it is found,
+    so `.claude` does not match `.claude-profiles`.
+*   A symbolic link or junction in a skill is followed, and a loop or a broken link is skipped.
+    `desktop.ini` and `Thumbs.db` are never copied.
+*   A read-only file in the target is made writable before it is replaced; its backup records the
+    attribute, and Restore puts it back. Restore only touches files inside the profile's own folder,
+    whatever a manifest says.
+*   Backups are under `.claude-profiles\backups`, inside the user's profile folder, so its permissions
+    keep them private. There is no separate mode to set.
+*   The removal commands for what Claude Code installed are `claude-as <command> mcp remove <name>
+    --scope user` and `claude-as <command> plugin uninstall <name>`, which work in PowerShell and
+    Command Prompt alike.
+*   With `CPM_REAL_CLAUDE` set to the folder holding the real `claude.exe`, a test runs real `claude
+    mcp add-json` and `mcp remove` in a throwaway profile folder. It passed with Claude Code on this PC:
+    a dropped secret stays out, and arguments with spaces and quotes survive the Windows command line.
+*   The panel is now 440 px wide, so its five footer buttons fit on one row. The footer wraps instead of
+    cutting a button off when Windows text is set larger. A UI test checks the fit.
+*   A tick or a secret's tick works through UI Automation too, as screen readers use, and keeps keyboard
+    focus on the box.
 
 **Tests to port first.** These carry the rules, so each Swift test has a C# case with the same name:
 the ownership check on `--resume`, a broken `default` stopping plain `claude`, the built-in profile

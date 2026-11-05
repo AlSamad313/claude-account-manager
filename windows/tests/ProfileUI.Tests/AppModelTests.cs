@@ -20,6 +20,8 @@ sealed class Harness : IDisposable
     public FakeUserPathStore UserPath { get; } = new(null);
     /// Ctrl+C "works": the process is gone at once.
     public StopHelper Helper { get; }
+    /// Claude Code's own commands, for Copy setup.
+    public FakeRunner Claude { get; } = new();
     public AppModel Model { get; }
 
     public Harness(bool installed = true, string? shellSource = null)
@@ -35,6 +37,7 @@ sealed class Harness : IDisposable
             Stopper = new SessionStopper(S.Locator, Processes, Helper) { Grace = TimeSpan.FromMilliseconds(300), PollInterval = TimeSpan.FromMilliseconds(20) },
             Doctor = new Doctor(S.Locator, S.Credentials, new FakeRunner(), new FakeMachine(new FakePath("", ""))),
             Installer = new ShellInstaller(S.Store, new ProfileCore.UserPath(S.Locator, UserPath), new PowerShellProfile(S.Locator, Path.Combine(S.Home, "Documents"))),
+            Copier = new SetupCopier(S.Store, new ClaudeCLI(S.Locator, Claude, new ClaudeBinaryLocator(S.Locator, RealBin())), new LiveSessionReader(S.Locator, Processes)),
             ShellSource = shellSource,
         };
         Model = new AppModel(env) { Now = () => new DateTime(2026, 11, 5, 12, 0, 0) };
@@ -47,6 +50,18 @@ sealed class Harness : IDisposable
     }
 
     public Profile Builtin => S.Store.Load().ProfileById(Profile.BuiltinId)!;
+
+    /// A folder with an empty claude.exe, so the copier finds a real binary to hand to the fake runner.
+    string RealBin()
+    {
+        var bin = S.PathOf("realbin");
+        Directory.CreateDirectory(bin);
+        File.WriteAllText(Path.Combine(bin, "claude.exe"), "");
+        return bin;
+    }
+
+    /// Signs the built-in profile in, so it can be a copy source.
+    public void SignInBuiltin() => S.SignIn(Builtin, "u-builtin", "me@example.com");
 
     /// A profile that finished signing in.
     public Profile Ready(string name, string command, string uuid = "u-1")

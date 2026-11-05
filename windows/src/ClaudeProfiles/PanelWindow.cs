@@ -7,11 +7,11 @@ using ProfileUI;
 
 namespace ClaudeProfiles;
 
-/// The tray panel: borderless, 400 px wide, above the tray like the Wi-Fi flyout (D7). It has no
+/// The tray panel: borderless, 440 px wide, above the tray like the Wi-Fi flyout (D7). It has no
 /// taskbar button, and closes on Esc or when it loses focus.
 public sealed partial class PanelWindow : Window
 {
-    const double PanelWidth = 400, PanelHeight = 620, Gap = 12;
+    const double PanelWidth = 440, PanelHeight = 620, Gap = 12;
 
     readonly AppModel model;
     DateTime hiddenAt;

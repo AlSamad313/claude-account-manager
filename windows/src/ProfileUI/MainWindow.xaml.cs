@@ -165,6 +165,7 @@ public partial class MainWindow : Window
     void Add(object sender, RoutedEventArgs e) => Go(new Route.Add());
     void Shell(object sender, RoutedEventArgs e) => Go(new Route.Shell());
     void Doctor(object sender, RoutedEventArgs e) => Go(new Route.Doctor());
+    void CopySetup(object sender, RoutedEventArgs e) => Go(new Route.Copy());
     void RefreshClick(object sender, RoutedEventArgs e) => _ = model.Refresh();
     void NewTerminal(object sender, RoutedEventArgs e) => _ = model.NewSessionOnTarget();
 }
