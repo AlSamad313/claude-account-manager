@@ -36,8 +36,9 @@ public sealed class ProcessRunner : IProcessRunner
         using (p)
         {
             p.StandardInput.Close();
-            var outTask = p.StandardOutput.ReadToEndAsync();
-            var errTask = p.StandardError.ReadToEndAsync();
+            // Own threads, not the shared pool: when the pool is busy, a queued read can finish too late and lose the output.
+            var stdout = new PipeReader(p.StandardOutput);
+            var stderr = new PipeReader(p.StandardError);
             var timedOut = !p.WaitForExit(timeout);
             if (timedOut)
             {
@@ -45,10 +46,29 @@ public sealed class ProcessRunner : IProcessRunner
                 p.WaitForExit(2000);
             }
             // A child that keeps the pipes open must not hang the caller.
-            Task.WaitAll([outTask, errTask], TimeSpan.FromSeconds(1));
+            var grace = Stopwatch.StartNew();
+            var outText = stdout.Result(TimeSpan.FromSeconds(1));
+            var errText = stderr.Result(TimeSpan.FromSeconds(1) - TimeSpan.FromTicks(Math.Min(grace.Elapsed.Ticks, TimeSpan.TicksPerSecond)));
             var code = p.HasExited ? p.ExitCode : -1;
-            return new ProcessResult(outTask.IsCompletedSuccessfully ? outTask.Result : "",
-                                     errTask.IsCompletedSuccessfully ? errTask.Result : "", code, timedOut);
+            return new ProcessResult(outText, errText, code, timedOut);
         }
+    }
+
+    private sealed class PipeReader
+    {
+        private readonly Thread _thread;
+        private string _text = "";
+
+        public PipeReader(StreamReader reader)
+        {
+            _thread = new Thread(() =>
+            {
+                // The pipe closes under this read when a child that kept it open outlives the caller.
+                try { _text = reader.ReadToEnd(); } catch (Exception) { }
+            }) { IsBackground = true };
+            _thread.Start();
+        }
+
+        public string Result(TimeSpan wait) => _thread.Join(wait) ? _text : "";
     }
 }

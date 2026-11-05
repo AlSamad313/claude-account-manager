@@ -17,7 +17,7 @@ Newest first. There are no versioned releases yet.
 ### Fixed
 
 - Two backups made in the same millisecond could share a folder, so the second replaced the first.
-- A command's output could come back empty when the Mac was busy.
+- A command's output could come back empty when the computer was busy, on macOS and Windows.
 
 ## First working version
 
