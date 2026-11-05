@@ -306,6 +306,22 @@ public sealed class SupportTests
         Assert.AreEqual(WinProcess.ProcessCheck.NotRunning, WinProcess.Query(int.MaxValue - 1).State);
     }
 
+    // With every shared worker thread busy, output must still arrive. CI found this on a small machine.
+    [TestMethod]
+    public void RunnerCapturesOutputWhileTheThreadPoolIsBusy()
+    {
+        // Not disposed: queued work may still reach it after the test ends.
+        var release = new ManualResetEventSlim();
+        for (var i = 0; i < 256; i++) ThreadPool.QueueUserWorkItem(_ => release.Wait());
+        try
+        {
+            var r = new ProcessRunner().Run(Cmd, ["/d", "/c", "echo out& echo err>&2"], null, TimeSpan.FromSeconds(5));
+            StringAssert.Contains(r.Stdout, "out");
+            StringAssert.Contains(r.Stderr, "err");
+        }
+        finally { release.Set(); }
+    }
+
     [TestMethod]
     public void RunnerCapturesOutputAndAppliesEnv()
     {
