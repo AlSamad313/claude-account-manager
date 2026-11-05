@@ -27,16 +27,18 @@ Manager names with `claude` or `anthropic` at that time: none.
 | C8 | **Pass** | Title held in all 4 runs, including with a tool running. Control without the variable: Claude Code renamed the tab |
 | C9 | **Pass so far** | Both live records matched to 0.000 s, including a desktop app one, and every test session since. An elevated session needs a UAC click and was not run; the design handles access denied either way |
 | C10 | Partly | `cli`, `claude-desktop`, and `sdk-cli` for `claude -p`. `status`: `busy`, `idle`. VS Code and Cowork still to see |
-| C11 | Stage W1 | |
-| C12 | Stage W1 | Baseline below |
+| C11 | **Pass** | Git Bash runs the status line command. A quoted Windows path with a space works, and colour codes show. Details below |
+| C12 | **Partly** | With the bin folder first in `PATH`, PowerShell 5, Command Prompt and Git Bash (plain and login) all find the wrapper. Writing the real user `PATH` was not done yet, so new windows, the Run dialog and `claude update` are still to see. No PowerShell 7 or VS Code on this PC. Baseline below |
 | C13 | **Done** | Details below |
 | C14 | **Done, one pass of searching** | Details below |
 | C15 | Waiting | VS Code is not installed on this PC |
 | C16 | **Pass** | Details below |
-| C17, C18, C19 | Stage W1 | Need the wrapper |
+| C17 | **Pass** | The wrapper survives a console Ctrl+C, waits for Claude Code, and exits 0.02 s after it with its exit code. Details below |
+| C18 | Waiting | Needs a Claude Code release newer than 2.1.318, so `claude update` has something to install |
+| C19 | Waiting | The desktop app (package `Claude_pzs8sxrjxfjjc`) was not running. Needs the real install, then a desktop app Code session |
 | C20 | Stage W3 | |
-| C21 | Stage W1 | Smart App Control is off on this PC |
-| C22 | Stage W1 | |
+| C21 | **Pass, with Smart App Control off** | The unsigned wrapper ran hundreds of times in tests and checks, with Defender real-time protection on and no detections. Smart App Control is off on this PC, so its effect is not seen |
+| C22 | **Pass** | The wrapper adds about 9 ms. Details below |
 
 ## C1
 
@@ -120,6 +122,57 @@ Before any install: the only `claude` on `PATH` is `%USERPROFILE%\.local\bin\cla
 execution policy for normal shells is Restricted (all scopes Undefined), so a PowerShell profile line would not
 run until the user allows scripts. This matches the note in design flow 10.
 
+Stage W1, 2026-11-05, before the real install: the built wrapper was put first in the `PATH` of the shell that started
+each one. `Get-Command claude` in Windows PowerShell 5.1, `where claude` in Command Prompt, and `command -v claude` in
+Git Bash (`bash -c` and `bash -lc`) all gave the wrapper. `claude-as` also ran from Git Bash. The registry user `PATH`
+was not changed, so a new window from Explorer, the Run dialog, and the order after `claude update` are still to see.
+
+## C11: status line
+
+2026-11-05. Test folder 1's `settings.json` was given a status line that runs a probe exe in a folder with a space
+in its name: `"C:\Users\Abdul Samad\.cpm-s0\11\dir with space\probe.exe" --profile-label test`. In an interactive
+session the label showed, with its colour, and no escape codes showed as text. The probe found that Claude Code runs
+the command as `"C:\Program Files\Git\bin\..\usr\bin\bash.exe" -c "<command>"` (with `MSYSTEM=MINGW64`), about every
+2 seconds, with the session's JSON on standard input. Backslashes inside the double quotes reach the program
+unchanged, so the path does not need forward slashes. The real wrapper, called the same way through Git Bash with a
+home folder path holding a space, printed the coloured dot and the display name. Folder 1's `settings.json` was then
+put back.
+
+## C17: Ctrl+C with the wrapper as parent
+
+2026-11-05. Sessions were started through the built wrapper (`windows\build\bin\claude.exe`) in a new window, in test
+folder 1. The wrapper took its override path, because folder 1 is outside `.claude-profiles`, but was still Claude
+Code's parent. Then `s0 ctrlc` sent one console Ctrl+C, which reaches every process on the console, wrapper included.
+
+| Terminal | Status | Claude Code ended after | Exit code | Wrapper | Window |
+| --- | --- | --- | --- | --- | --- |
+| Windows Terminal | idle | 1.1 s | 0 | Still running at the Ctrl+C; exited 0.02 s after Claude Code, code 0 | Open, back at the prompt |
+| Windows Terminal | busy | 2.6 s | 0 | Same | Open |
+| Classic console | idle | 1.1 s | 0 | Same | Open |
+
+The busy run's `sleep` outlived the session, as in C7. A non-zero exit code passing through is covered by the
+wrapper tests (`ExitCodesPassThrough`).
+
+## C22: wrapper launch time
+
+2026-11-05, Native AOT wrapper of 1.9 MB. Median of 41 runs: the fake `claude.exe` took 6.6 ms directly and 15.3 ms
+through the wrapper, so the wrapper adds 8.7 ms. With the real `claude.exe --version`, alternating 3 rounds of 7, it
+added 12.2 ms (14 ms direct, 26 ms wrapped). Both are well under the 50 ms limit.
+
+## Found while building stage W1
+
+- **Replacing a file that a reader has open.** `File.Move` with overwrite (`MoveFileEx`) fails while any program has the
+  target open, even with delete sharing. So the design's "the wrapper opens names with full sharing, so it never blocks
+  a replace" was not true with a plain move. `AtomicFile` now renames with POSIX semantics (`FileRenameInfoEx` with
+  `FILE_RENAME_FLAG_POSIX_SEMANTICS`), which a reader with delete sharing does not block, and falls back to the move with
+  retries. Test: `AReaderWithFullSharingNeverBlocksAReplace`.
+- **The .NET SDK edits the user `PATH` on first use.** Its first run added `%USERPROFILE%\.dotnet\tools` to the user
+  `PATH`. `build.ps1` now sets `DOTNET_ADD_GLOBAL_TOOLS_TO_PATH=false` so that it does not happen to contributors.
+- **Native AOT needs `vswhere.exe` on `PATH`.** A window opened before the Build Tools were installed fails to link.
+  `build.ps1` adds the Visual Studio Installer folder to its own `PATH`.
+- **Windows PowerShell 5.1 drops embedded quotes when it calls a native program.** This affects only test scripts, not
+  the product, which quotes with `ProcessStartInfo.ArgumentList`.
+
 ## C13: file-format key names
 
 - **Session records:** the macOS keys, plus `asksForConvertedSkills`, and `hostSessionId` on the desktop app's
@@ -170,4 +223,5 @@ None yet.
 ## Teardown
 
 Not yet. Test folders 4, 5 and 16 hold test data: an MCP entry was added and then removed, and the `egm` plugin
-is installed. `s0 teardown` and deleting `%USERPROFILE%\.cpm-s0` clear them.
+is installed. Folders 11 and 12 hold the C11 probe and a test wrapper layout. `s0 teardown` and deleting
+`%USERPROFILE%\.cpm-s0` clear them.

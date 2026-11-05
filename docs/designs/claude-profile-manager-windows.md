@@ -236,8 +236,9 @@ Changes from the base components:
 *   **RecycleBin** moves a folder to the Recycle Bin through the shell (`IFileOperation`). It
     refuses, rather than deleting outright, when the drive has no Recycle Bin.
 *   **FileWatcher** uses `FileSystemWatcher`. A buffer overflow event triggers a full re-read.
-*   **Wrapper** is its own small project that compiles one source file shared with ProfileCore:
-    the `names` and `default` reader. One exe is built and copied as `claude.exe` and
+*   **Wrapper** is its own small project that compiles two source files shared with ProfileCore
+    (`src/Shared/`): the `names` and `default` reader, and the real-binary rule with path
+    canonicalisation. One exe is built and copied as `claude.exe` and
     `claude-as.exe`; it decides what to do from its own file name. The same exe also answers
     `--profile-label <id>` (the status line) and `--send-ctrl-c <pid>` (flow 9).
 
@@ -267,11 +268,14 @@ allow only the user, SYSTEM and Administrators. `doctor` warns if `.claude-profi
 to anyone else. The `names` file's `configDir` column holds a Windows path; tabs and newlines
 cannot occur in one.
 
-Every file the tool replaces is written to a temporary file in the same folder and then moved
-over the original with `File.Replace` or `MoveFileEx(MOVEFILE_REPLACE_EXISTING)`. Windows refuses
-that move while another program has the file open without sharing it, so each replace retries
-for up to 2 seconds and then reports which program may hold it. The wrapper opens `names` and
-`default` with full sharing, so it never blocks a replace.
+Every file the tool replaces is written to a temporary file in the same folder and then renamed
+over the original with POSIX semantics (`SetFileInformationByHandle` with `FileRenameInfoEx` and
+`FILE_RENAME_FLAG_POSIX_SEMANTICS`, Windows 10 1607 and later on NTFS). A reader that opened the old
+file with delete sharing keeps reading it and does not block the rename. Plain
+`MoveFileEx(MOVEFILE_REPLACE_EXISTING)` fails in that case, which stage W1 found. Windows still refuses
+while a program has the file open without delete sharing, so each replace falls back to `MoveFileEx`
+and retries for up to 2 seconds, then reports that another program has the file open. The wrapper
+opens `names` and `default` with full sharing, so it never blocks a replace.
 
 `.lock` is held by opening it with `FileShare.None`, retried every 50 ms for up to 10 seconds.
 
@@ -534,6 +538,11 @@ hand. The `$PROFILE` line is found again by its `# claude-profiles` marker, so r
 that line. If PowerShell's execution policy stops profiles from running, the line has no effect.
 Doctor gives that as a note, and nothing else depends on it.
 
+`cpm uninstall-shell` takes the bin folder out of the user `PATH` again, by the same matching rule,
+and leaves the files and profiles alone. It exists from stage W1, so the `PATH` change can be undone
+before `cpm uninstall` is built in stage W5. Until stage W3, `build.ps1 -Install` runs
+`cpm install-shell` only.
+
 `build.ps1 -Install` installs the app per user in `%LOCALAPPDATA%\Programs\ClaudeProfiles\`. It adds
 a Start menu shortcut, which carries the app's ID so its notifications show its name. It also adds
 the startup value (D4) and the uninstall entry under
@@ -581,9 +590,10 @@ Each added profile's `settings.json` gets:
 "statusLine": { "type": "command", "command": "\"C:\\Users\\Abdul Samad\\.claude-profiles\\bin\\claude.exe\" --profile-label <id>" }
 ```
 
-The path is quoted because home folders can have spaces. How Claude Code on Windows runs this
-command, and whether colour codes show, is S0 check C11. If Git Bash runs it, the path is
-written with forward slashes instead.
+The path is quoted because home folders can have spaces. S0 check C11 found that Claude Code on
+Windows runs the command with Git Bash (`bash.exe -c "<command>"`), with the session's JSON on standard
+input. Backslashes inside double quotes reach the program unchanged, and colour codes show. The
+label never reads standard input.
 
 ### Build
 
@@ -598,9 +608,11 @@ written with forward slashes instead.
       src/Wrapper/                 console app, Native AOT → claude.exe / claude-as.exe
       src/ProfileUI/               WPF views and view models
       src/ClaudeProfiles/          WPF tray app → ClaudeProfiles.exe (no console window)
+      src/Shared/                  NamesFile.cs, RealClaude.cs: compiled into ProfileCore and the wrapper
       src/Shell/claude-profiles.ps1  PowerShell completion for claude-as
       tests/ProfileCore.Tests/     MSTest
       tests/Wrapper.Tests/         MSTest; runs the built wrapper against a fake claude.exe
+      tests/FakeClaude/            the fake claude.exe: prints its arguments and environment
       tests/ProfileUI.Tests/       MSTest; view models only
       build.ps1                    build, test, publish to build\, -Install
     ```
@@ -608,9 +620,12 @@ written with forward slashes instead.
 *   **Requirements**, in the style of the macOS README: Windows 11, the .NET 10 SDK, the Visual
     Studio Build Tools with "Desktop development with C++" (for Native AOT, D3), the native
     Claude Code (`claude.exe`), and Windows Terminal or the classic console. Visual Studio
-    itself is not needed. Neither the SDK nor the C++ tools are on this PC yet:
-    `winget install Microsoft.DotNet.SDK.10` and `winget install Microsoft.VisualStudio.2022.BuildTools`
-    with the C++ workload. `build.ps1` checks for both and says what is missing.
+    itself is not needed. `build.ps1` checks for both and says how to install what is missing. On
+    this PC, stage W1 installed the SDK per user with Microsoft's signed `dotnet-install.ps1` (no admin
+    rights), and the Visual Studio 2026 Build Tools with `winget install Microsoft.VisualStudio.BuildTools`
+    and the C++ workload. Tests use the `MSTest.Sdk` project SDK (D5), with Microsoft.Testing.Platform
+    chosen in `windows/global.json`. Both `cpm.exe` and the wrapper are built with Native AOT, so
+    `bin\` holds single-file exes that need no .NET runtime; ProfileCore uses source-generated JSON for that.
 *   **Tray icon:** WPF has none, so the app uses WinForms `NotifyIcon` (built into .NET) inside a WPF
     app. Its balloon call shows as a normal Windows notification (D8). The panel is a borderless
     WPF window placed above the tray, on the screen that holds the taskbar.
@@ -739,7 +754,7 @@ not repeated, because it tests Claude Code, not the platform.
 | Editing the user `PATH` damages it | Programs stop being found | Only the tool's own entry is moved or removed; old value logged first; value type kept; nothing written if near the size limit | `UserPath` tests on a test registry key; `writes.log` |
 | Smart App Control or Defender blocks the unsigned wrapper | `claude` does not start | Doctor note; optional signing | S0 check C21 |
 | A login token ends up in the Recycle Bin | Someone with the PC could restore it | `.credentials.json` is deleted outright before the folder is recycled | ProfileRemover tests |
-| Windows refuses a file replace while a reader holds it | A write fails | Retries for 2 seconds, then a clear error; the wrapper shares its reads | Tests with a held file |
+| Windows refuses a file replace while a reader holds it | A write fails | POSIX rename, which readers with delete sharing do not block; retries for 2 seconds, then a clear error; the wrapper shares its reads | Tests with a held file, with and without delete sharing |
 
 ## Future Improvements
 
@@ -762,6 +777,12 @@ The behaviour of each module is the base design's; the file list below says only
 | W3 | Do all of that from the tray app and window | `src/ProfileUI/*`, `src/ClaudeProfiles/App.xaml`, `TrayIcon.cs`, `Notifications.cs`, `FileWatcher.cs`, `StartupSetting.cs`, `AppInstall.cs` (shortcut, Installed apps entry, `--uninstall-app`); ProfileCore `UserPath.cs`, `PowerShellProfile.cs`; `src/Shell/claude-profiles.ps1` |
 | W4 | Copy setup, in the same two steps as base S4 | `SetupCopier/CopyPlan.cs`, `SecretDetector.cs`, `SettingsMerger.cs`, `BackupStore.cs`, `SetupCopier.cs`, `src/ProfileUI/CopySetupView.xaml` |
 | W5 | Remove a profile, and uninstall | `ProfileRemover.cs`, `RecycleBin.cs` |
+
+**Stage W1 as built (2026-11-05).** Three files listed for later stages came forward, because W1
+needs them: `UserPath.cs` (for `cpm install-shell`), `LiveSessionReader.cs` (`cpm discard` refuses while
+a session is live) and a first `RecycleBin.cs` (`cpm discard`, with `SHFileOperation`). `WinProcess.cs`
+holds every Windows call made so far. `cpm` answers the stage W1 commands, plus `uninstall-shell`, and
+names the later stage for the rest.
 
 **Tests to port first.** These carry the rules, so each Swift test has a C# case with the same name:
 the ownership check on `--resume`, a broken `default` stopping plain `claude`, the built-in profile

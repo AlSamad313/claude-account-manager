@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Stands in for the real claude.exe in wrapper tests. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>claude</AssemblyName>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+</Project>
