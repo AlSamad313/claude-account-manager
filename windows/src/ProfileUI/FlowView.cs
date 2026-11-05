@@ -51,6 +51,7 @@ public sealed class FlowView : ContentControl
             Route.Stop s => new StopView(s.SessionId),
             Route.Copy => new CopySetupView(),
             Route.Guide => new GuideView(),
+            Route.Remove r => new RemoveView(r.ProfileId),
             _ => null,
         };
         if (Content is FrameworkElement f)

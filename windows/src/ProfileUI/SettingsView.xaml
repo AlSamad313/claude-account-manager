@@ -23,6 +23,7 @@
             <TextBlock Style="{StaticResource Wrapped}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,6,0,0"
                        Text="Quit VS Code first if it is running. Opened from the Start menu, it uses the built-in profile." />
             <StackPanel Style="{StaticResource ButtonRow}">
+                <Button x:Name="RemoveButton" Content="Remove…" Style="{StaticResource DialogButton}" Click="Remove" />
                 <Button Content="Done" IsDefault="True" Style="{DynamicResource AccentButtonStyle}" MinWidth="88" Click="Done" />
             </StackPanel>
         </StackPanel>

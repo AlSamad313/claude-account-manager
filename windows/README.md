@@ -3,9 +3,8 @@
 The Windows version of Claude Profiles: several Claude Code accounts side by side, each in its own
 `CLAUDE_CONFIG_DIR` folder. The design is `../docs/designs/claude-profile-manager-windows.md`.
 
-**Status: stage W4.** The tray app and its window, with Copy setup and the Guide, `cpm` (add, keep, retry, discard, default, list, new,
-resume, stop, code, doctor, install-shell, uninstall-shell) and the `claude` / `claude-as` wrapper work.
-Removing a profile, and uninstalling (W5), are still to come.
+**Status: stage W5, the last stage.** The tray app and its window, with Copy setup, Remove and the Guide, `cpm` (add, keep, retry, discard, remove, default, list, new,
+resume, stop, code, doctor, install-shell, uninstall-shell, uninstall) and the `claude` / `claude-as` wrapper work.
 
 ## Requirements
 
@@ -49,6 +48,11 @@ default in the panel changes it.
 
 To undo the `PATH` change and the completion line: `cpm uninstall-shell`. To remove the app: Settings >
 Apps > Installed apps > Claude Profiles > Uninstall. Neither touches your profiles or `~\.claude`.
+
+To remove one profile: Settings… > Remove… in the app, or `cpm remove <name>`. It signs the profile out,
+deletes its login file and moves its folder to the Recycle Bin. To remove every added profile and the
+command line setup: exit the app, then `cpm uninstall`. It moves `.claude-profiles` to the Recycle Bin,
+and leaves `~\.claude`, your current login and the app itself alone.
 
 ## Layout
 

@@ -1,10 +1,9 @@
 # Hands-on test script: Windows
 
 The Windows copy of `E2E-checklist.md`, with the same parts and step numbers. Where a step cannot match yet, it says
-why. Stage W3 adds the tray app, so only copy setup (Part 8, stage W4) and removal (Part 11, stage W5) are still
-missing. Steps marked "Windows only" have no macOS twin.
+why. Every part exists from stage W5. Steps marked "Windows only" have no macOS twin.
 
-Work from top to bottom, because later parts depend on earlier ones. Allow about 2 to 3 hours for what exists now.
+Work from top to bottom, because later parts depend on earlier ones. Allow about 2 to 3 hours, plus time for Parts 8 and 11.
 You can stop between any two parts.
 
 Tick a box only when everything under **Expect** happened. If anything differs, don't work around it. Note the step
@@ -360,7 +359,7 @@ This is the step most likely to feel broken, so watch it closely.
       installed: it opens on Official; with it open, try again, and **Expect:** it says to quit first.
 - [ ] **7.7 Settings.** "⋯", Settings… on WRP. Change the name to `WRP2` and the colour, then Done. **Expect:** the row
       and dot update, and the command stays `wrp`. A new `claude-as wrp` shows `● WRP2`. Change it back. On `main`,
-      **Expect:** a note that it is your existing `.claude` folder. (Remove comes in stage W5.)
+      **Expect:** a note that it is your existing `.claude` folder. There is no Remove… on it.
 - [ ] **7.8 The window.** Open window…. **Expect:** a sidebar and a table. Selecting a profile filters, and the New
       Terminal button follows the selection. Right-click a profile: New Terminal, Open VS Code, Make default,
       Settings…. Right-click a session: Resume (or Stop… on a live one), and copy and open folder items. Enter resumes
@@ -485,7 +484,31 @@ $W; $T
 
 ## Part 11: Removal
 
-Stage W5. Until then, `cpm discard` (4.7) is the only way to remove a profile, and only before it is kept.
+- [ ] **11.1 Refused while live.** Start `claude-as test` and leave it running. Run `cpm remove test`. **Expect:** "has
+      a live session". In the app: "⋯", Settings… on Test, then Remove…. **Expect:** the red notice, and Remove profile
+      can't be pressed. `/exit`.
+- [ ] **11.2 Answer no.** `cpm remove test`, then `n`. **Expect:** "Not removed", and `claude-as test auth status` is
+      still signed in.
+- [ ] **11.3 The built-in can't go.** `cpm remove main`. **Expect:** refused. In the app, its Settings has no Remove….
+- [ ] **11.4 Remove the default, from the app.** `cpm default test`. Settings… on Test, Remove…. **Expect:** text
+      saying the built-in becomes the default. Press Cancel. **Expect:** back on Settings. Remove… again, then Remove
+      profile. **Expect:** back on the list, Test gone, and the tray icon in the built-in profile's colour.
+- [ ] **11.5 Check it:**
+
+  ```powershell
+  cpm default
+  claude auth status
+  claude-as wrp auth status
+  claude-as test --version
+  ```
+
+  **Expect:** `main`; **Personal still signed in**, although Test may have used the same account; WRP signed in;
+  "no profile named 'test'". The Recycle Bin has Test's folder, with no `.credentials.json` in it.
+- [ ] **11.6 Remove from the command line.** `cpm add Temp temp '#888888'`, `claude-as temp auth login`, then
+      `cpm keep temp`. `cpm remove temp` and answer `y`. **Expect:** "Removed Temp", and the other logins are
+      unaffected.
+- [ ] **11.7 Guide** (Windows only). Guide > Rename or remove. **Expect:** its steps name Settings… and Remove…, and
+      the Recycle Bin.
 
 ## Part 12: Finish
 
@@ -494,10 +517,16 @@ Stage W5. Until then, `cpm discard` (4.7) is the only way to remove a profile, a
       longer completes (the marked line is gone from your PowerShell profile). Your profiles stay.
       `cpm install-shell --completion` puts it back.
 - [ ] **12.2 Optional: uninstall the app** (Windows only). Settings > Apps > Installed apps > Claude Profiles >
-      Uninstall. **Expect:** the dot goes away, then a message that profiles and the command line tools are kept. The
+      Uninstall. **Expect:** the tray icon goes away, then a message that profiles and the command line tools are kept. The
       Start menu entry, the Startup apps entry and `%LOCALAPPDATA%\Programs\ClaudeProfiles` are gone, and
       `cpm list` still works. `build.ps1 -Install` puts the app back.
-- [ ] **12.3** Delete `$HOME\cpm-test` if you like.
+- [ ] **12.3 Optional: uninstall everything** (last, as it removes every added profile). Run `cpm uninstall` with the
+      app running. **Expect:** it refuses and changes nothing. Exit the app from its tray menu, run it again and
+      answer `y`. **Expect:** each profile removed, the PATH line, and a note that bin is deleted a few seconds after
+      cpm exits. Open a new window. **Expect:** `(Get-Command claude).Source` is the real Claude Code, Personal is
+      still signed in, `.claude-profiles` is in the Recycle Bin and gone from your home folder, and Task Manager >
+      Startup apps no longer lists Claude Profiles. The app itself stays until 12.2.
+- [ ] **12.4** Delete `$HOME\cpm-test` if you like.
 
 ## When something goes wrong
 

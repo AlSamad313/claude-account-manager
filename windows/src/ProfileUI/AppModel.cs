@@ -18,6 +18,7 @@ public sealed class AppEnvironment
     public required Doctor Doctor { get; init; }
     public required ShellInstaller Installer { get; init; }
     public required SetupCopier Copier { get; init; }
+    public required ProfileRemover Remover { get; init; }
     /// The app's own copy of the bin files. Null when there is none, as in tests.
     public string? ShellSource { get; init; }
 
@@ -29,6 +30,7 @@ public sealed class AppEnvironment
         {
             Store = store, Login = new LoginCoordinator(store), Launcher = new Launcher(store), Index = new SessionIndex(locator),
             Stopper = new SessionStopper(locator), Doctor = new Doctor(locator), Installer = new ShellInstaller(store), Copier = new SetupCopier(store),
+            Remover = new ProfileRemover(store),
             ShellSource = shellSource,
         };
     }
@@ -45,6 +47,7 @@ public abstract record Route
     public sealed record Stop(string SessionId) : Route;
     public sealed record Copy : Route;
     public sealed record Guide : Route;
+    public sealed record Remove(string ProfileId) : Route;
 
     public static readonly Route Home = new Main();
 }
@@ -167,6 +170,7 @@ public sealed class AppModel(AppEnvironment env) : INotifyPropertyChanged
     public LoginState? LoginState { get; private set; }
     public bool LoginBusy { get; private set; }
     public bool StopBusy { get; private set; }
+    public bool RemoveBusy { get; private set; }
     public bool Busy { get; private set; }
 
     SessionRow? missingFolderRow;
@@ -324,9 +328,10 @@ public sealed class AppModel(AppEnvironment env) : INotifyPropertyChanged
     {
         var (s, e) = await Run(() =>
         {
-            var reconcile = new Reconciler(env.Store, env.Login).Run();
+            var reconcile = new Reconciler(env.Store, env.Login, env.Remover).Run();
             var reg = env.Store.Load();
-            return new Snapshot(reg, env.Index.Sessions(reg.Profiles), env.Installer.IsInstalled(), reconcile.AccountNotices);
+            return new Snapshot(reg, env.Index.Sessions(reg.Profiles), env.Installer.IsInstalled(),
+                [.. reconcile.RemovalsResumed.Select(n => $"Finished removing {n}."), .. reconcile.RemovalWarnings, .. reconcile.AccountNotices]);
         });
         if (e != null) { ErrorText = Message(e); return; }
         Profiles = s!.Reg.Profiles;
@@ -536,6 +541,28 @@ public sealed class AppModel(AppEnvironment env) : INotifyPropertyChanged
 
     /// For a profile that was signed out: opens a terminal window to sign in again.
     public Task SignIn(Profile p) => Launch(() => env.Launcher.Login(p));
+
+    public bool HasLiveSession(string profileId) => LiveCount(profileId) > 0;
+
+    /// Design flow 7. Refused during a live session; a warning (say, a failed sign-out) shows as a notice.
+    public async Task RemoveProfile(string profileId)
+    {
+        if (ProfileById(profileId) is not { } p) return;
+        RemoveBusy = true;
+        Raise(nameof(RemoveBusy));
+        var (r, e) = await Run(() => env.Remover.Remove(p));
+        RemoveBusy = false;
+        Raise(nameof(RemoveBusy));
+        if (e != null) ErrorText = Message(e);
+        else
+        {
+            ErrorText = null;
+            NoticeText = r!.Warnings.FirstOrDefault();
+            Route = Route.Home;
+            if (SidebarSelection == profileId) SidebarSelection = "all";
+        }
+        await Refresh();
+    }
 
     public Task Rename(Profile p, string name) => Change(() => env.Store.Rename(p.Id, name));
     public Task SetColor(Profile p, string color) => Change(() => env.Store.SetColor(p.Id, color));

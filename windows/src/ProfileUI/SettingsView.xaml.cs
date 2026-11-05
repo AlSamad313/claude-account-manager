@@ -32,6 +32,7 @@ public partial class SettingsView : FlowBase
         CommandText.Text = $"Command: claude-as {p.CommandName}. Fixed when the profile was created. Renaming changes only the display name; the folder and sign-in stay the same.";
         AccountText.Text = $"Account: {p.Email ?? "not signed in"}";
         BuiltinText.Visibility = p.Builtin ? Visibility.Visible : Visibility.Collapsed;
+        RemoveButton.Visibility = p.Builtin ? Visibility.Collapsed : Visibility.Visible;
         VSCodeButton.Content = $"Open VS Code on {p.DisplayName}";
         DefaultButton.Visibility = p.Id != Model.DefaultProfileId && p.State == ProfileState.Ready ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -50,6 +51,13 @@ public partial class SettingsView : FlowBase
 
     void OpenVSCode(object sender, RoutedEventArgs e) { if (Model.ProfileById(profileId) is { } p) _ = Model.OpenVSCode(p); }
     void MakeDefault(object sender, RoutedEventArgs e) { if (Model.ProfileById(profileId) is { } p) _ = Model.SetDefault(p); }
+
+    void Remove(object sender, RoutedEventArgs e)
+    {
+        SaveName();
+        Model.ErrorText = null;
+        Model.Route = new Route.Remove(profileId);
+    }
 
     void Done(object sender, RoutedEventArgs e)
     {

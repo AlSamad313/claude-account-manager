@@ -899,6 +899,40 @@ icon, Guide and release packaging" are ported:
     current DPI. The app icon (`windows/scripts/make-icon.ps1`, `app.ico`) is the macOS app icon: the
     burst on a fixed orange (#D97857) square, with a smaller margin at 32 px and below. Both read the mask
     from `Resources/`, so a new mask reaches both apps.
+*   **Finding the real Claude Code** also skips any `PATH` folder that holds `claude-as.exe`, as well as
+    the tool's own bin folder. Real Claude Code never ships that file, so another copy of the wrapper (an
+    installed copy seen from a test home, say) is never run as Claude Code. The macOS locator skips only
+    its own bin folder.
+
+**Stage W5 as built (2026-11-05).** Removing a profile works from the app (Settings… > Remove…, then
+Remove profile) and from `cpm remove <name> [--yes]`, and `cpm uninstall [--yes]` removes everything
+but the built-in profile. `ProfileCore/ProfileRemover.cs` is a port of the Swift file, and its tests are
+the Swift tests, case for case. Changes from macOS:
+
+*   No Keychain step. After `claude auth logout`, `.credentials.json` is deleted outright if it is still
+    there, so a login never reaches the Recycle Bin (flow 7 step 5). It is deleted even when logout
+    fails, which is then a warning.
+*   Logout runs only when the folder exists and the profile was signed in, so resuming a removal never
+    recreates a folder that is already gone.
+*   The remover refuses a profile whose folder is not inside `.claude-profiles\profiles\`, before it
+    changes anything.
+*   The folder and its backups go to the Recycle Bin (`RecycleBin.Move`, `SHFileOperation`). On a drive
+    without one, removal stops and the profile stays `deleting`; the next reconcile tries again. The
+    reconciler reports a removal that still fails as a notice, instead of failing to start.
+*   `cpm uninstall` refuses, before changing anything, while the app runs (it holds a named mutex), as the
+    app would recreate `.claude-profiles`, or while any added profile has a live session. It then removes
+    each added profile, takes the bin folder out of the user `PATH` and the marked line out of
+    `$PROFILE`, removes the Start with Windows value, and moves everything in `.claude-profiles` except
+    `bin` to the Recycle Bin. `bin` holds only copies of the tool, and cpm itself runs from it, so it is
+    deleted outright: what can go goes at once, and a hidden `cmd` deletes the rest a few seconds after cpm
+    exits, then removes `.claude-profiles` if that leaves it empty. It does nothing for a path holding
+    characters cmd could misread, and says to delete the folder by hand.
+*   The `$PROFILE` line and the startup value are found by their marker and name, not by the home
+    folder, so `cpm uninstall` must not be run with a test `USERPROFILE`. Tests replace both.
+*   Uninstalling from Installed apps now says that `cpm uninstall` removes the profiles and tools.
+*   The Guide topic is "Rename or remove", as on macOS, with Recycle Bin for Trash.
+*   A test using the real Recycle Bin runs only with `CPM_REAL_RECYCLE_BIN=1`, since other tests never
+    touch it.
 
 **Tests to port first.** These carry the rules, so each Swift test has a C# case with the same name:
 the ownership check on `--resume`, a broken `default` stopping plain `claude`, the built-in profile

@@ -94,8 +94,8 @@ public sealed class GuideTests
     public void TheStepsUseWindowsWords()
     {
         var all = string.Join(" ", GuideTopic.All.SelectMany(t => t.Steps.Append(t.Summary).Append(t.Tip ?? "")));
-        foreach (var mac in new[] { "Terminal window", "Trash", "menu bar", "Quit", "Open Terminal", "Remove…" })
-            Assert.DoesNotContain(mac, all, $"\"{mac}\" is a macOS word, or not built on Windows yet");
+        foreach (var mac in new[] { "Terminal window", "Trash", "menu bar", "Quit", "Open Terminal" })
+            Assert.DoesNotContain(mac, all, $"\"{mac}\" is a macOS word");
     }
 
     [TestMethod]

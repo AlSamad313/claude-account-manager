@@ -334,4 +334,26 @@ public static class WinProcess
         var r = SHFileOperationW(ref op);
         return r != 0 ? r : op.fAnyOperationsAborted != 0 ? -1 : 0;
     }
+
+    /// For `cpm uninstall`: a hidden cmd waits a few seconds, for cpm to exit, then deletes the bin
+    /// folder and the lock file, and removes the profiles folder only if that leaves it empty.
+    /// Returns false, and does nothing, for a path cmd could misread.
+    public static bool DeleteFolderAfterExit(string profilesRoot)
+    {
+        var root = Path.GetFullPath(profilesRoot).TrimEnd('\\');
+        if (!string.Equals(Path.GetFileName(root), ".claude-profiles", StringComparison.OrdinalIgnoreCase)) return false;
+        if (root.IndexOfAny(['"', '%', '^', '!']) >= 0) return false;
+        var bin = Path.Combine(root, "bin");
+        var lockFile = Path.Combine(root, ".lock");
+        var script = $"ping -n 4 127.0.0.1 >nul & rmdir /s /q \"{bin}\" & del /q /a \"{lockFile}\" & rmdir \"{root}\"";
+        var psi = new System.Diagnostics.ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"))
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetTempPath(),
+        };
+        psi.Arguments = "/d /s /c \"" + script + "\"";
+        using var _ = System.Diagnostics.Process.Start(psi);
+        return true;
+    }
 }

@@ -74,7 +74,7 @@ static partial class AppInstall
             DeleteAfterExit(dir);
         MessageBox.Show(
             "Claude Profiles was uninstalled.\n\nYour profiles, and the command line tools in .claude-profiles\\bin, are kept. " +
-            "To take the tools off your PATH, run: cpm uninstall-shell",
+            "To remove the profiles and the tools too, run: cpm uninstall. To take only the tools off your PATH, run: cpm uninstall-shell",
             Name, MessageBoxButton.OK, MessageBoxImage.Information);
         return 0;
     }

@@ -11,6 +11,7 @@ internal static class Program
           cpm keep <commandName>                          finish a sign-in
           cpm retry <commandName>                         sign out and sign in again
           cpm discard <commandName>                       remove a profile waiting for a sign-in
+          cpm remove <commandName> [--yes]                sign out a profile and move its folder to the Recycle Bin
           cpm default [<commandName>]                     show or set the default profile
           cpm list [--profile <commandName>] [--live]     list sessions
           cpm new <commandName> [<folder>]                start a session in a new terminal window
@@ -21,11 +22,8 @@ internal static class Program
           cpm install-shell [--completion]                install claude, claude-as and cpm, and put them first in your PATH;
                                                           --completion also adds tab completion to your PowerShell profile
           cpm uninstall-shell                             take them out of your PATH, and the completion line out again
-
-        Coming in later stages of the Windows build: remove, uninstall.
+          cpm uninstall [--yes]                           remove all added profiles and the command line setup
         """;
-
-    static readonly string[] Later = ["remove", "uninstall"];
 
     static string TabSafe(string s) => s.Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ');
 
@@ -48,9 +46,11 @@ internal static class Program
         void Reconcile()
         {
             new EventLog(locator).Rotate();
-            var r = new Reconciler(store, login).Run();
+            var r = new Reconciler(store, login, new ProfileRemover(store)).Run();
             foreach (var n in r.LoginNotices.Concat(r.AccountNotices)) Console.WriteLine(n);
             foreach (var n in r.RowsWithoutFolder) Console.WriteLine($"{n}: its folder is missing. Run: cpm doctor");
+            foreach (var n in r.RemovalsResumed) Console.WriteLine($"Finished removing {n}.");
+            foreach (var n in r.RemovalWarnings) Console.WriteLine(n);
         }
 
         try
@@ -235,8 +235,52 @@ internal static class Program
                         : $"{locator.BinDir} was not in your user PATH. Nothing changed.");
                     return 0;
                 }
+                case "remove":
+                {
+                    var yes = rest.Contains("--yes");
+                    var names = rest.Where(a => a != "--yes").ToArray();
+                    if (names.Length != 1 || rest.Length != names.Length + (yes ? 1 : 0)) return Fail(Usage);
+                    Reconcile();
+                    var p = Find(names[0]);
+                    if (p.Builtin) return Fail("The built-in profile cannot be removed.");
+                    Console.WriteLine($"This signs {p.DisplayName} out, deletes its login file, and moves its folder, history and backups to the Recycle Bin. Other profiles stay signed in.");
+                    if (store.DefaultProfile().Id == p.Id) Console.WriteLine("It is the default, so the built-in profile becomes the default.");
+                    switch (Confirm($"Remove {p.DisplayName}?", yes))
+                    {
+                        case false: return Ok("Not removed.");
+                        case null: return Fail("Not removed. Without a terminal to confirm on, use --yes.");
+                    }
+                    var r = new ProfileRemover(store).Remove(p);
+                    foreach (var w in r.Warnings) Console.WriteLine(w);
+                    return Ok($"Removed {p.DisplayName}.");
+                }
+                case "uninstall":
+                {
+                    var yes = rest is ["--yes"];
+                    if (rest.Length != 0 && !yes) return Fail(Usage);
+                    Reconcile();
+                    var added = store.Load().Profiles.Count(p => !p.Builtin);
+                    Console.WriteLine($"This signs out {added} added profile(s) and moves .claude-profiles to the Recycle Bin, with their history and backups. " +
+                                      "It takes the bin folder out of your user PATH, the completion line out of your PowerShell profile, and Claude Profiles out of Start with Windows. " +
+                                      "~\\.claude and your current login are not touched. Exit the Claude Profiles app first.");
+                    switch (Confirm("Uninstall?", yes))
+                    {
+                        case false: return Ok("Nothing changed.");
+                        case null: return Fail("Nothing changed. Without a terminal to confirm on, use --yes.");
+                    }
+                    var u = new ProfileRemover(store).Uninstall();
+                    foreach (var w in u.Removed.SelectMany(r => r.Warnings)) Console.WriteLine(w);
+                    foreach (var f in u.CompletionRemoved) Console.WriteLine($"Took the completion line out of {f}.");
+                    if (u.PathRemoved) Console.WriteLine($"Took {locator.BinDir} out of your user PATH.");
+                    if (u.BinLeft)
+                        Console.WriteLine(u.BinDeletedLater
+                            ? $"{locator.BinDir} is in use by this command, so it is deleted a few seconds after it exits."
+                            : $"{locator.BinDir} is in use. Delete it yourself once nothing is running from it.");
+                    Console.WriteLine("Uninstalled. Open a new terminal window, where plain claude runs Claude Code directly. " +
+                                      "To remove the app too, use Settings > Apps > Installed apps.");
+                    return 0;
+                }
                 default:
-                    if (Later.Contains(command)) return Fail($"cpm {command} is not in this build yet. It comes in a later stage of the Windows build.");
                     return Fail(Usage);
             }
         }
@@ -244,6 +288,15 @@ internal static class Program
         {
             return Fail(e.Message);
         }
+    }
+
+    /// True to go ahead, false when the user said no, null when there is no terminal to ask on.
+    static bool? Confirm(string question, bool yes)
+    {
+        if (yes) return true;
+        if (Console.IsInputRedirected) return null;
+        Console.Write($"{question} [y/N] ");
+        return (Console.ReadLine()?.Trim().ToLowerInvariant()) is "y" or "yes";
     }
 
     static int Ok(string message)

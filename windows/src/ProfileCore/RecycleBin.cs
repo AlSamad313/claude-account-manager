@@ -15,4 +15,16 @@ public static class RecycleBin
         if (r != 0 || Directory.Exists(dir))
             throw new ProfileException($"Could not move {dir} to the Recycle Bin (code {r}). A program may have a file in it open.");
     }
+
+    /// A file or a folder. A folder goes as MoveFolder does.
+    public static void Move(string path)
+    {
+        if (Directory.Exists(path)) { MoveFolder(path); return; }
+        if (!File.Exists(path)) return;
+        if (!WinProcess.HasRecycleBin(path))
+            throw new ProfileException($"{path} is on a drive with no Recycle Bin, so it was not removed. Delete it yourself if you want it gone.");
+        var r = WinProcess.MoveToRecycleBin(path);
+        if (r != 0 || File.Exists(path))
+            throw new ProfileException($"Could not move {path} to the Recycle Bin (code {r}). A program may have it open.");
+    }
 }

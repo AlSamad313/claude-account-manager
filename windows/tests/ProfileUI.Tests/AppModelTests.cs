@@ -24,6 +24,7 @@ sealed class Harness : IDisposable
     /// Claude Code's own commands, for Copy setup.
     public FakeRunner Claude { get; } = new();
     public List<string> FolderAskedFor { get; } = [];
+    public List<string> Trashed { get; } = [];
     public string? ChosenFolder { get; set; }
     public AppModel Model { get; }
 
@@ -41,6 +42,11 @@ sealed class Harness : IDisposable
             Doctor = new Doctor(S.Locator, S.Credentials, new FakeRunner(), new FakeMachine(new FakePath("", ""))),
             Installer = new ShellInstaller(S.Store, new ProfileCore.UserPath(S.Locator, UserPath), new PowerShellProfile(S.Locator, Path.Combine(S.Home, "Documents"))),
             Copier = new SetupCopier(S.Store, new ClaudeCLI(S.Locator, Claude, new ClaudeBinaryLocator(S.Locator, RealBin())), new LiveSessionReader(S.Locator, Processes)),
+            // Removal with nothing real: a fake logout and Recycle Bin, and no PATH, $PROFILE or startup value.
+            Remover = new ProfileRemover(S.Store, new ClaudeCLI(S.Locator, Claude, new ClaudeBinaryLocator(S.Locator, RealBin())),
+                new LiveSessionReader(S.Locator, Processes), trash: path => { Trashed.Add(path); Directory.Delete(path, recursive: true); },
+                userPath: new ProfileCore.UserPath(S.Locator, UserPath), powerShell: new PowerShellProfile(S.Locator, Path.Combine(S.Home, "Documents")),
+                removeStartupValue: () => { }, appRunning: () => false, deleteLater: _ => false),
             ShellSource = shellSource,
         };
         Model = new AppModel(env) { Now = () => new DateTime(2026, 11, 5, 12, 0, 0) };
