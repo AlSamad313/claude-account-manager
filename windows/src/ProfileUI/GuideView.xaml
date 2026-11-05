@@ -1,0 +1,15 @@
+<ui:FlowBase x:Class="ProfileUI.GuideView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:ProfileUI">
+    <ui:FlowBase.Resources>
+        <ResourceDictionary Source="/ProfileUI;component/Theme.xaml" />
+    </ui:FlowBase.Resources>
+    <StackPanel>
+        <TextBlock Text="Guide" Style="{StaticResource FlowTitle}" />
+        <StackPanel x:Name="Topics" Margin="0,4,0,0" />
+        <StackPanel Style="{StaticResource ButtonRow}">
+            <Button Content="Done" IsDefault="True" IsCancel="True" Style="{StaticResource DialogButton}" Click="Home" />
+        </StackPanel>
+    </StackPanel>
+</ui:FlowBase>

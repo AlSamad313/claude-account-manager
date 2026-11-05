@@ -1,11 +1,10 @@
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace ClaudeProfiles;
 
-/// The coloured dot in the notification area, in the default profile's colour. WPF has no tray
+/// The icon in the notification area, in the default profile's colour. WPF has no tray
 /// icon, so this is WinForms' NotifyIcon. Its balloon call shows as a normal Windows notification (D8).
 public sealed partial class TrayIcon : IDisposable
 {
@@ -41,7 +40,7 @@ public sealed partial class TrayIcon : IDisposable
         icon.BalloonTipClosed += (_, _) => onBalloonClick = null;
     }
 
-    /// Redraws the dot only when the colour changed. The tooltip is limited to 127 characters.
+    /// Redraws the icon only when the colour changed. The tooltip is limited to 127 characters.
     public void Update(string color, string defaultLine)
     {
         var text = $"Claude Profiles — {defaultLine}";
@@ -50,7 +49,7 @@ public sealed partial class TrayIcon : IDisposable
         {
             shownColor = color;
             var old = iconHandle;
-            using (var bmp = Dot(color))
+            using (var bmp = Burst(color))
             {
                 iconHandle = bmp.GetHicon();
             }
@@ -67,20 +66,27 @@ public sealed partial class TrayIcon : IDisposable
         icon.ShowBalloonTip(10_000, title, text, ToolTipIcon.None);
     }
 
-    static Bitmap Dot(string hex)
+    /// The burst on the default profile's colour (ProfileUI.TrayImage), at the tray's icon size for this DPI.
+    static Bitmap Burst(string hex)
     {
         var size = SystemInformation.SmallIconSize.Width;
-        var c = ColorTranslator.FromHtml(hex is { Length: 7 } && hex[0] == '#' ? hex : "#8A8F98");
-        var bmp = new Bitmap(size, size);
-        using var g = Graphics.FromImage(bmp);
-        g.SmoothingMode = SmoothingMode.AntiAlias;
-        var pad = Math.Max(1f, size / 8f);
-        var r = new RectangleF(pad, pad, size - 2 * pad - 1, size - 2 * pad - 1);
-        using var fill = new SolidBrush(c);
-        g.FillEllipse(fill, r);
-        // A faint ring keeps dark colours visible on a dark taskbar, and light ones on a light one.
-        using var ring = new Pen(Color.FromArgb(110, 255, 255, 255), Math.Max(1f, size / 16f));
-        g.DrawEllipse(ring, r);
+        var src = ProfileUI.TrayImage.Render(hex, size, ProfileUI.TrayImage.BundledMask);
+        var px = new byte[size * size * 4];
+        src.CopyPixels(px, size * 4, 0);
+        // WPF's pixels are premultiplied; GDI+ wants them straight.
+        for (var i = 0; i < px.Length; i += 4)
+        {
+            var a = px[i + 3];
+            if (a is 0 or 255) continue;
+            for (var k = 0; k < 3; k++) px[i + k] = (byte)Math.Min(255, px[i + k] * 255 / a);
+        }
+        var bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        var data = bmp.LockBits(new Rectangle(0, 0, size, size), System.Drawing.Imaging.ImageLockMode.WriteOnly, bmp.PixelFormat);
+        try
+        {
+            for (var y = 0; y < size; y++) Marshal.Copy(px, y * size * 4, data.Scan0 + y * data.Stride, size * 4);
+        }
+        finally { bmp.UnlockBits(data); }
         return bmp;
     }
 

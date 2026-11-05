@@ -50,4 +50,17 @@ public static class UiState
         ModalOpen++;
         try { return show(); } finally { ModalOpen--; }
     }
+
+    /// The folder for a new session. DefaultDirectory applies only until the user has chosen a
+    /// folder: after that Windows opens the picker where they were last.
+    public static string? ChooseFolder(string profileName)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = $"Choose a folder for the {profileName} session",
+            DefaultDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        };
+        var owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive);
+        return WithModal(() => (owner != null ? dialog.ShowDialog(owner) : dialog.ShowDialog()) == true) ? dialog.FolderName : null;
+    }
 }

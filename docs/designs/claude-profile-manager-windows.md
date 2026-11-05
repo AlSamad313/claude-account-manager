@@ -156,7 +156,7 @@ parts and order, so the two can be compared.
 | macOS | Windows |
 | --- | --- |
 | Coloured dot in the menu bar, in the default profile's colour; no Dock icon | Coloured dot in the notification area, in the default profile's colour. Hovering shows "Claude Profiles — plain claude uses <name>". The panel has no taskbar button. Windows first puts new icons in the overflow (^) area; the first-run notification says how to pin it |
-| Click the dot: a 400-point-wide panel | Left-click the dot: the same panel, 440 px wide so its footer fits, above the tray like the Wi-Fi flyout (D7). It closes on Esc or when it loses focus. Right-click shows the usual tray menu: Open Claude Profiles, Start with Windows (tick), Exit |
+| Click the dot: a 400-point-wide panel | Left-click the dot: the same panel, 460 px wide so its footer fits, above the tray like the Wi-Fi flyout (D7). It closes on Esc or when it loses focus. Right-click shows the usual tray menu: Open Claude Profiles, Start with Windows (tick), Exit |
 | Panel: "Claude Profiles", "plain claude uses <name>", "Filter by title, folder or profile", "Set up shell first" notice, profile rows, session rows, footer Add profile…, Open window…, Copy setup…, Doctor, Quit | The same text and order, with Windows words: "Set up command line" instead of "Set up shell", Exit instead of Quit |
 | No sign-in alert; the step shows when you open the panel | A Windows notification when a sign-in is seen; clicking it opens that step (D8) |
 | Light or dark from macOS | Light or dark and accent colour from Windows (D7) |
@@ -824,7 +824,7 @@ the plan:
 *   Starting a second copy passes its right to bring a window to the front to the running copy
     (`AllowSetForegroundWindow`) before it signals. Without that, the running copy's panel opened without focus
     and hid itself at once, because it closes on losing focus.
-*   The panel is a fixed 440 × 620 (400 wide until W4), clamped to the work area, in the corner of the work area at the taskbar's
+*   The panel is a fixed 460 × 620 (400 wide until W4, 440 in W4), clamped to the work area, in the corner of the work area at the taskbar's
     tray end. It does not size itself to its content.
 *   The panel and the window both show the current flow step, as on macOS (E2E 7.9). A step is built only in a
     host that is visible, so the work a step starts when it opens (Doctor, the sign-in check) runs once. A hidden
@@ -880,6 +880,25 @@ is a port of the Swift files, and its tests are the Swift tests, case for case. 
     cutting a button off when Windows text is set larger. A UI test checks the fit.
 *   A tick or a secret's tick works through UI Automation too, as screen readers use, and keeps keyboard
     focus on the box.
+
+**From macOS 41bf56e (2026-11-05).** Three app changes from the Mac commit "Add open-source prep, menu-bar
+icon, Guide and release packaging" are ported:
+
+*   **New Terminal asks for a folder.** Every New Terminal (panel row, window button, Ctrl+T, sidebar menu)
+    opens Windows' folder picker, titled "Choose a folder for the <name> session". Cancel starts nothing.
+    The picker opens in the home folder the first time, then where the user was last, which Windows
+    remembers. The panel stays open behind it. `AppModel.ChooseFolder` is replaced in tests.
+*   **Guide.** Panel footer Guide, and More > Guide or F1 in the window. The same eleven topics as macOS
+    (`GuideTopic.All`), one open at a time, in Windows words: terminal window, tray icon, Select Folder,
+    Close VS Code. "Rename or remove" is "Rename a profile" until Remove comes in W5, and "Good to know"
+    says the app starts with Windows. A test keeps each line short, free of `@`, and free of macOS words.
+    The panel is 460 px wide so the sixth footer button fits.
+*   **Icons.** The tray icon is now the macOS menu-bar icon: the burst from the shared
+    `Resources/BurstMask.png` on a rounded square in the default profile's colour, in white, or dark grey on
+    colours lighter than 0.72 luminance (`ProfileUI/TrayImage.cs`). It is drawn at the tray's size for the
+    current DPI. The app icon (`windows/scripts/make-icon.ps1`, `app.ico`) is the macOS app icon: the
+    burst on a fixed orange (#D97857) square, with a smaller margin at 32 px and below. Both read the mask
+    from `Resources/`, so a new mask reaches both apps.
 
 **Tests to port first.** These carry the rules, so each Swift test has a C# case with the same name:
 the ownership check on `--resume`, a broken `default` stopping plain `claude`, the built-in profile

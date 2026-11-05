@@ -209,20 +209,20 @@ public sealed class CopySetupViewTests
 [TestClass, DoNotParallelize]
 public sealed class PanelLayoutTests
 {
-    /// The tray panel is 440 wide (PanelWindow). At the usual text size every footer button fits on one
+    /// The tray panel is 460 wide (PanelWindow). At the usual text size every footer button fits on one
     /// row inside it; with larger text the row wraps instead of cutting a button off.
     [TestMethod]
     public void TheFooterButtonsFitThePanel() => Run(async () =>
     {
         using var h = new Harness();
         await h.Model.Refresh();
-        var w = Host(new PanelView(), h.Model, width: 440);
+        var w = Host(new PanelView(), h.Model, width: 460);
         try
         {
             await Until(() => MaybeButton(w, "Exit")?.ActualWidth > 0, "laid out");
             var root = (FrameworkElement)w.Content;
             double right = 0;
-            foreach (var name in new[] { "Add profile…", "Open window…", "Copy setup…", "Doctor" })
+            foreach (var name in new[] { "Add profile…", "Open window…", "Copy setup…", "Doctor", "Guide" })
             {
                 var b = Button(w, name);
                 var x = b.TranslatePoint(new Point(0, 0), root).X;
@@ -232,7 +232,7 @@ public sealed class PanelLayoutTests
                 right = x + b.ActualWidth;
             }
             var exit = Button(w, "Exit");
-            Assert.IsLessThanOrEqualTo(exit.TranslatePoint(new Point(0, 0), root).X, right, "Doctor runs into Exit");
+            Assert.IsLessThanOrEqualTo(exit.TranslatePoint(new Point(0, 0), root).X, right, "Guide runs into Exit");
             Assert.IsLessThanOrEqualTo(root.ActualWidth, exit.TranslatePoint(new Point(exit.ActualWidth, 0), root).X, "Exit is cut off");
         }
         finally { w.Close(); }

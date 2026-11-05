@@ -23,6 +23,7 @@ public partial class MainWindow : Window
         InputBindings.Add(new KeyBinding(new Command(() => { SearchBox.Focus(); SearchBox.SelectAll(); }), Key.F, ModifierKeys.Control));
         InputBindings.Add(new KeyBinding(new Command(() => _ = model.Refresh()), Key.F5, ModifierKeys.None));
         InputBindings.Add(new KeyBinding(new Command(() => _ = model.NewSessionOnTarget()), Key.T, ModifierKeys.Control));
+        InputBindings.Add(new KeyBinding(new Command(() => Go(new Route.Guide())), Key.F1, ModifierKeys.None));
     }
 
     protected override void OnClosing(CancelEventArgs e)
@@ -166,6 +167,7 @@ public partial class MainWindow : Window
     void Shell(object sender, RoutedEventArgs e) => Go(new Route.Shell());
     void Doctor(object sender, RoutedEventArgs e) => Go(new Route.Doctor());
     void CopySetup(object sender, RoutedEventArgs e) => Go(new Route.Copy());
+    void Guide(object sender, RoutedEventArgs e) => Go(new Route.Guide());
     void RefreshClick(object sender, RoutedEventArgs e) => _ = model.Refresh();
     void NewTerminal(object sender, RoutedEventArgs e) => _ = model.NewSessionOnTarget();
 }

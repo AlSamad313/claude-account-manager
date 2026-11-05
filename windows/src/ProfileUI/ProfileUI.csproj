@@ -8,5 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ProfileCore\ProfileCore.csproj" />
     <InternalsVisibleTo Include="ProfileUI.Tests" />
+    <!-- Shared with macOS, so a new mask reaches both. -->
+    <Resource Include="..\..\..\Resources\BurstMask.png" Link="BurstMask.png" />
   </ItemGroup>
 </Project>

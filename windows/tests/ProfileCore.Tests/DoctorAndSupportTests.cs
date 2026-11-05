@@ -223,6 +223,23 @@ public sealed class SupportTests
             Assert.AreEqual(Path.Combine(real, "claude.exe"), new ClaudeBinaryLocator(s.Locator, $"{spelling};;{real}").RealBinary(), spelling);
     }
 
+    /// Another copy of the wrapper, such as an installed copy seen from a test home, is never taken for
+    /// Claude Code: running it would start the wrapper again.
+    [TestMethod]
+    public void SkipsAnotherCopyOfTheWrapper()
+    {
+        using var s = new Sandbox();
+        var other = s.PathOf("other-install\\bin");
+        Directory.CreateDirectory(other);
+        File.WriteAllText(Path.Combine(other, "claude.exe"), "");
+        File.WriteAllText(Path.Combine(other, "claude-as.exe"), "");
+        var real = s.PathOf("real");
+        Directory.CreateDirectory(real);
+        File.WriteAllText(Path.Combine(real, "claude.exe"), "");
+        Assert.AreEqual(Path.Combine(real, "claude.exe"), new ClaudeBinaryLocator(s.Locator, $"{other};{real}").RealBinary());
+        Assert.IsNull(new ClaudeBinaryLocator(s.Locator, other).RealBinary());
+    }
+
     [TestMethod]
     public void NeverPicksAScript()
     {

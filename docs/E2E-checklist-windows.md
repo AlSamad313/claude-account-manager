@@ -57,7 +57,7 @@ see the notice, and in 2.1 the result says the folder was already first in `PATH
   ```
 
   **Expect:** all tests pass, then "Installed in …\Programs\ClaudeProfiles and started". No Windows security prompt.
-- [ ] **1.2 The icon.** **Expect:** a coloured dot in the notification area, or in the overflow (^) next to it, and a
+- [ ] **1.2 The icon.** **Expect:** a burst on a rounded square, in the built-in profile's colour, in the notification area, or in the overflow (^) next to it, and a
       notification that says the icon may be there and can be dragged next to the clock. Drag it there. Hovering shows
       "Claude Profiles — plain claude uses" and the built-in profile's name. The panel has no taskbar button.
 - [ ] **1.3 The panel** opened by itself above the tray. If not, left-click the dot. **Expect:** the title "Claude
@@ -213,7 +213,7 @@ This is the step most likely to feel broken, so watch it closely.
 - [ ] **5.1 Start a session on the built-in.** In window A: `cd $HOME\cpm-test\a; claude`. Accept the trust prompt
       and send: `Say hello in one word.`
 - [ ] **5.2 Change the default.** In window B: `cpm default wrp`. **Expect:** "Plain claude now uses WRP". Within a
-      second or two the tray dot takes WRP's colour, and hovering it says "plain claude uses WRP".
+      second or two the tray icon takes WRP's colour, and hovering it says "plain claude uses WRP".
 - [ ] **5.3 Follows with no reload.** Still in window B:
 
   ```powershell
@@ -337,8 +337,10 @@ This is the step most likely to feel broken, so watch it closely.
 
 ## Part 7: Sessions from the app
 
-- [ ] **7.1 New Terminal.** Panel: New Terminal on WRP. **Expect:** a terminal window with WRP in its title, no
-      security prompt, and a running row within 5 seconds of reopening the panel. It opens in your home folder, so a
+- [ ] **7.1 New Terminal.** Panel: New Terminal on WRP. **Expect:** a folder dialog titled "Choose a folder for the WRP
+      session", with the panel still open behind it. Press Cancel. **Expect:** nothing starts. Press New Terminal again,
+      choose `cpm-test\a` and press Select Folder. **Expect:** a terminal window with WRP in its title, no
+      security prompt, and a running row within 5 seconds of reopening the panel. It opens in `cpm-test\a`, so a
       trust prompt is normal. Send a short message, then `/exit`. **Expect:** the window closes (design D6).
 - [ ] **7.2 The list stays fresh.** Close the panel. Run `cpm new test $HOME\cpm-test\b` and send a message. Reopen the
       panel. **Expect:** that session appears within a few seconds. If it doesn't update while the panel is open, note
@@ -372,6 +374,11 @@ This is the step most likely to feel broken, so watch it closely.
       the same place and size. Closing it leaves the dot in the tray.
 - [ ] **7.13 Start with Windows** (Windows only). Right-click the dot and clear Start with Windows. **Expect:** Task
       Manager > Startup apps no longer lists it (press Refresh, or reopen Task Manager). Tick it again.
+- [ ] **7.14 Guide.** Panel: Guide. **Expect:** eleven folded topics. Opening one folds the one open before. Under
+      Terminal commands, a command can be selected and copied. Done goes back to the list. In the window, F1 and
+      More > Guide open it too.
+- [ ] **7.15 New Terminal in the window.** In the window, press New Terminal, Ctrl+T, and New Terminal from a
+      profile's right-click menu. **Expect:** each asks for a folder, and Cancel starts nothing.
 
 ## Part 8: Copy setup
 

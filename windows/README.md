@@ -3,7 +3,7 @@
 The Windows version of Claude Profiles: several Claude Code accounts side by side, each in its own
 `CLAUDE_CONFIG_DIR` folder. The design is `../docs/designs/claude-profile-manager-windows.md`.
 
-**Status: stage W4.** The tray app and its window, with Copy setup, `cpm` (add, keep, retry, discard, default, list, new,
+**Status: stage W4.** The tray app and its window, with Copy setup and the Guide, `cpm` (add, keep, retry, discard, default, list, new,
 resume, stop, code, doctor, install-shell, uninstall-shell) and the `claude` / `claude-as` wrapper work.
 Removing a profile, and uninstalling (W5), are still to come.
 
@@ -27,7 +27,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File windows\build.ps1 -Install #
 ```
 
 `-Install` copies the app to `%LOCALAPPDATA%\Programs\ClaudeProfiles`, adds a Start menu shortcut, an
-entry in Settings > Apps > Installed apps and a Start with Windows value, and starts it. Its coloured dot
+entry in Settings > Apps > Installed apps and a Start with Windows value, and starts it. Its icon, a burst in the default profile's colour,
 appears by the clock, or in the overflow (^) area. On first start the panel asks you to **Set up command
 line**. That copies `cpm.exe`, `claude.exe` and `claude-as.exe` to `%USERPROFILE%\.claude-profiles\bin`,
 puts that folder first in your user `PATH`, and can add tab completion to your PowerShell profile. The old

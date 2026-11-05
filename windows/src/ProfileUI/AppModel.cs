@@ -44,6 +44,7 @@ public abstract record Route
     public sealed record Shell : Route;
     public sealed record Stop(string SessionId) : Route;
     public sealed record Copy : Route;
+    public sealed record Guide : Route;
 
     public static readonly Route Home = new Main();
 }
@@ -415,7 +416,13 @@ public sealed class AppModel(AppEnvironment env) : INotifyPropertyChanged
 
     // ---- Sessions
 
-    public Task NewSession(Profile p) => Launch(() => env.Launcher.NewSession(p));
+    /// Asks which folder a new session starts in, given the profile's name; null when cancelled.
+    /// Replaced in tests. Windows' folder picker opens on the folder chosen last, which it remembers.
+    public Func<string, string?> ChooseFolder { get; set; } = UiState.ChooseFolder;
+
+    /// New Terminal: asks which folder to start in, as on macOS. Cancelling starts nothing.
+    public Task NewSession(Profile p) => ChooseFolder(p.DisplayName) is { } folder ? NewSession(p, folder) : Task.CompletedTask;
+    public Task NewSession(Profile p, string folder) => Launch(() => env.Launcher.NewSession(p, folder));
     public Task NewSessionOnTarget() => Target is { } t ? NewSession(t) : Task.CompletedTask;
     public Task OpenVSCode(Profile p) => Launch(() => env.Launcher.OpenVSCode(p));
 

@@ -8,7 +8,8 @@ namespace ProfileUI.Tests;
 sealed class RecordingOpener : ITerminalOpener
 {
     public List<string> CommandLines { get; } = [];
-    public void Open(string commandLine, string workingDir) => CommandLines.Add(commandLine);
+    public List<string> Folders { get; } = [];
+    public void Open(string commandLine, string workingDir) { CommandLines.Add(commandLine); Folders.Add(workingDir); }
 }
 
 /// An AppModel over a temporary home. Nothing here starts a terminal, changes PATH or runs Claude Code.
@@ -22,6 +23,8 @@ sealed class Harness : IDisposable
     public StopHelper Helper { get; }
     /// Claude Code's own commands, for Copy setup.
     public FakeRunner Claude { get; } = new();
+    public List<string> FolderAskedFor { get; } = [];
+    public string? ChosenFolder { get; set; }
     public AppModel Model { get; }
 
     public Harness(bool installed = true, string? shellSource = null)
@@ -41,6 +44,9 @@ sealed class Harness : IDisposable
             ShellSource = shellSource,
         };
         Model = new AppModel(env) { Now = () => new DateTime(2026, 11, 5, 12, 0, 0) };
+        // The folder picker, answered with ChosenFolder; null is Cancel.
+        Model.ChooseFolder = name => { FolderAskedFor.Add(name); return ChosenFolder; };
+        ChosenFolder = S.Home;
     }
 
     public void MarkInstalled()

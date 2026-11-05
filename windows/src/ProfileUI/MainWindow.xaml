@@ -73,6 +73,7 @@
                             <MenuItem Header="Set up command line…" Click="Shell" />
                             <MenuItem Header="Copy setup…" Click="CopySetup" />
                             <MenuItem Header="Doctor" Click="Doctor" />
+                            <MenuItem Header="Guide" InputGestureText="F1" Click="Guide" />
                             <MenuItem Header="Refresh" InputGestureText="F5" Click="RefreshClick" />
                         </MenuItem>
                     </Menu>

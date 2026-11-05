@@ -21,18 +21,20 @@
             <!-- Bottom bar -->
             <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" Padding="8">
                 <DockPanel>
-                    <Button DockPanel.Dock="Right" Content="Exit" Style="{StaticResource Small}" Click="Exit" VerticalAlignment="Top" />
+                    <Button DockPanel.Dock="Right" Content="Exit" Style="{StaticResource Small}" Padding="7,3" Click="Exit" VerticalAlignment="Top" />
                     <!-- Wraps rather than cutting a button off when Windows makes text larger. -->
                     <WrapPanel Margin="0,0,0,-4">
                         <WrapPanel.Resources>
                             <Style TargetType="Button" BasedOn="{StaticResource Small}">
                                 <Setter Property="Margin" Value="0,0,4,4" />
+                                <Setter Property="Padding" Value="7,3" />
                             </Style>
                         </WrapPanel.Resources>
                         <Button Content="Add profile…" Click="Add" />
                         <Button Content="Open window…" Click="OpenWindow" />
                         <Button Content="Copy setup…" Click="CopySetup" />
                         <Button Content="Doctor" Click="Doctor" />
+                        <Button Content="Guide" Click="Guide" />
                     </WrapPanel>
                 </DockPanel>
             </Border>
