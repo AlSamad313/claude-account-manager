@@ -15,8 +15,9 @@ function in-folder($n) { $env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.cpm-s0\$n" 
 function out-folder { Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue }
 ```
 
-Already done on 2026-11-04: the backup, `s0 prep`, and the checks that need no sign-in (C5, C9 in
-part, C13, C14, C16). See the results file.
+Already done: the backup, `s0 prep`, C1 to C9 (2026-11-04 and 2026-11-05), C13, C14, C16, and C10 in part.
+See the results file. Still open: two different accounts side by side (step 4 of Part A, with a second
+account), an elevated session for C9, and C10 for VS Code and Cowork.
 
 ## Part A: logins (C1, C2, C3)
 

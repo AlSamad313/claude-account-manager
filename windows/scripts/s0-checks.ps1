@@ -58,6 +58,39 @@ public static class CpmS0 {
         return 0;
     }
 
+    [StructLayout(LayoutKind.Sequential)] public struct Coord { public short X; public short Y; }
+    [StructLayout(LayoutKind.Sequential)] public struct Rect { public short Left; public short Top; public short Right; public short Bottom; }
+    [StructLayout(LayoutKind.Sequential)] public struct BufferInfo { public Coord Size; public Coord Cursor; public short Attributes; public Rect Window; public Coord MaxSize; }
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern uint GetConsoleTitleW(StringBuilder title, uint size);
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr sa, uint disposition, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool GetConsoleScreenBufferInfo(IntPtr h, out BufferInfo info);
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool ReadConsoleOutputCharacterW(IntPtr h, StringBuilder text, uint length, Coord start, out uint read);
+
+    // Call only in a throwaway process. Returns the window title, or the visible text of that console.
+    public static string Inspect(uint pid, bool screen) {
+        FreeConsole();
+        if (!AttachConsole(pid)) { return "attach failed: " + Marshal.GetLastWin32Error(); }
+        SetConsoleCtrlHandler(IntPtr.Zero, true);
+        if (!screen) {
+            StringBuilder t = new StringBuilder(1024);
+            GetConsoleTitleW(t, 1024);
+            return t.ToString();
+        }
+        IntPtr h = CreateFileW("CONOUT$", 0xC0000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
+        BufferInfo info;
+        if (!GetConsoleScreenBufferInfo(h, out info)) { return "no buffer info: " + Marshal.GetLastWin32Error(); }
+        StringBuilder all = new StringBuilder();
+        for (short y = info.Window.Top; y <= info.Window.Bottom; y++) {
+            StringBuilder line = new StringBuilder(info.Size.X);
+            Coord c = new Coord(); c.X = 0; c.Y = y;
+            uint read;
+            ReadConsoleOutputCharacterW(h, line, (uint)info.Size.X, c, out read);
+            all.AppendLine(line.ToString(0, (int)read).TrimEnd());
+        }
+        CloseHandle(h);
+        return all.ToString();
+    }
+
     // The quoting rule the wrapper will use: CommandLineToArgvW and the C runtime split it back.
     public static string Quote(string a) {
         if (a.Length > 0 && a.IndexOfAny(new char[] { ' ', '\t', '\n', '\v', '"' }) < 0) { return a; }
@@ -79,7 +112,8 @@ public static class CpmS0 {
         return string.Join(" ", q);
     }
 
-    // Runs exe with exactly these arguments. configDir null: CLAUDE_CONFIG_DIR removed.
+    // Runs exe with exactly these arguments. configDir null or empty: CLAUDE_CONFIG_DIR removed.
+    // Empty counts too, because PowerShell turns $null into "" for a [string] parameter.
     public static string[] Run(string exe, string[] args, string configDir, int timeoutMs) {
         ProcessStartInfo psi = new ProcessStartInfo(exe, Join(args));
         psi.UseShellExecute = false;
@@ -89,7 +123,7 @@ public static class CpmS0 {
         psi.StandardOutputEncoding = Encoding.UTF8;
         psi.StandardErrorEncoding = Encoding.UTF8;
         psi.CreateNoWindow = true;
-        if (configDir == null) { psi.EnvironmentVariables.Remove("CLAUDE_CONFIG_DIR"); }
+        if (string.IsNullOrEmpty(configDir)) { psi.EnvironmentVariables.Remove("CLAUDE_CONFIG_DIR"); }
         else { psi.EnvironmentVariables["CLAUDE_CONFIG_DIR"] = configDir; }
         using (Process p = Process.Start(psi)) {
             p.StandardInput.Close();
@@ -308,6 +342,20 @@ switch ($Command) {
         Write-Output ("Process {0}: {1} after {2:N1}s and {3} Ctrl+C" -f $target, $(if ($gone) { 'ended' } else { 'STILL RUNNING' }), ((Get-Date) - $t0).TotalSeconds, $sent)
     }
     'ctrlc-inner' { exit ([CpmS0]::SendCtrlC([uint32]$Arg1)) }
+    { $_ -in 'title', 'screen' } {
+        # C8 and test support: read another console's title or visible text, through a throwaway helper.
+        if (-not $Arg1) { throw "Usage: $Command <pid>" }
+        $out = [IO.Path]::GetTempFileName()
+        $self = $MyInvocation.MyCommand.Path
+        Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$self`"", 'inspect-inner', $Arg1, "`"$Command|$out`"") -WindowStyle Hidden -Wait
+        Get-Content -Raw -Encoding UTF8 -LiteralPath $out
+        Remove-Item -LiteralPath $out
+    }
+    'inspect-inner' {
+        $mode, $out = $Arg2 -split '\|', 2
+        $text = [CpmS0]::Inspect([uint32]$Arg1, $mode -eq 'screen')
+        [IO.File]::WriteAllText($out, $text, (New-Object Text.UTF8Encoding $false))
+    }
     'teardown' {
         $exe = Real-Claude
         foreach ($d in Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue) {

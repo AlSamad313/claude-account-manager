@@ -284,7 +284,8 @@ claude.exe [args] / claude-as.exe <name> [args]:
   same choices as base flow 1: override, CLAUDE_PROFILE_ID, default, names, ownership check,
   login-variable warning
   build the environment: set or remove CLAUDE_CONFIG_DIR, set CLAUDE_PROFILE_ID and
-    CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
+    CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1. For the built-in profile the variable is removed,
+    never set to "": a blank value makes Claude Code report signed out (S0 results)
   if a console is attached: set its title to the display name (SetConsoleTitleW)
   append one line to logs\launch.log
   find the real claude.exe (below)
@@ -343,7 +344,17 @@ run\<uuid>.launch  (UTF-8 JSON)
 
 Then it starts `bin\claude-as.exe --launch <path to that file>` in a new console window
 (`CreateProcess` with `CREATE_NEW_CONSOLE`). Windows opens that in the user's default terminal,
-which is Windows Terminal on this PC. The wrapper, in launch mode:
+which is Windows Terminal on this PC (seen in S0: the default-terminal handoff).
+
+**Fresh environment.** The new process gets the user's own environment, built with
+`CreateEnvironmentBlock(user token, inherit: false)`. That is what a window opened from the Start menu
+gets, so `PATH` is current and nothing leaks in from the caller. On macOS, `open -a Terminal` gives
+the same. Without this, `cpm new` run from inside a Claude Code session would pass its session markers
+(`CLAUDE_CODE_CHILD_SESSION` and others) to the new window, and Claude Code there turns off transcript
+saving (S0 results, "Inherited session variables"). The wrapper then sets the profile's variables as in
+flow 1.
+
+The wrapper, in launch mode:
 
 ```text
 1. Accepts the file only if it is directly inside run\, is under 60 seconds old, and parses.
@@ -468,8 +479,15 @@ sent from a process attached to the same console.
 5.   Still alive (same PID and start time): send a second Ctrl+C, where macOS sends SIGTERM.
      Wait up to 5 seconds more.
 6.   Still alive: report "did not stop" and give the PID. Nothing stronger is sent (D2).
-7.   Log the result.
+7.   Ended: list any of the session's child processes, recorded before step 3, that are still
+     running, such as a shell command a busy session had started. Show their names and PIDs, and
+     say they were left running. They are never ended by the tool.
+8.   Log the result.
 ```
+
+S0 check C7 found that one Ctrl+C ended every session within 2.6 seconds, idle or busy, in Windows
+Terminal and in a classic console, with exit code 0, so step 5 is a safeguard only. It also found the
+case in step 7: a busy session's `sleep` kept running after Claude Code exited.
 
 A helper process does this because attaching to another console changes the calling process's
 console, and the app and `cpm` must keep their own.
