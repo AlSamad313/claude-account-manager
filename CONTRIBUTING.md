@@ -106,15 +106,15 @@ If an AI tool helped write your change, that's fine. You're still responsible fo
 
 ## Ideas to work on
 
-These are open if you want them. Please open an issue to claim one.
+These are open if you want them. Comment on the issue to claim one. Issues labelled
+[good first issue](https://github.com/AlSamad313/claude-account-manager/labels/good%20first%20issue) are a good place to start.
 
-- Windows: listing and stopping sessions, the tray app, Copy setup and profile removal (stages W2 to W5 in the [Windows design](docs/designs/claude-profile-manager-windows.md))
-- Support for terminals other than Terminal.app, such as iTerm2
-- An option to start the app at login
-- A signed and notarized release, or a Homebrew cask, so the macOS warning goes away
-- Support for bash and fish as the main shell
-- Guide entries that jump straight to the feature they describe
-- Testing on more macOS and Claude Code versions
+- [#6](https://github.com/AlSamad313/claude-account-manager/issues/6) Support for terminals other than Terminal.app, such as iTerm2
+- [#7](https://github.com/AlSamad313/claude-account-manager/issues/7) An option to start the app at login
+- [#8](https://github.com/AlSamad313/claude-account-manager/issues/8) A signed and notarized release, or a Homebrew cask, so the macOS warning goes away
+- [#9](https://github.com/AlSamad313/claude-account-manager/issues/9) Support for bash and fish as the main shell
+- [#10](https://github.com/AlSamad313/claude-account-manager/issues/10) Guide entries that jump straight to the feature they describe
+- [#11](https://github.com/AlSamad313/claude-account-manager/issues/11) Testing on more macOS and Claude Code versions
 
 ## Making a release
 
