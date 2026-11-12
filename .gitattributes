@@ -1,0 +1,10 @@
+# Let Git normalise text files, so macOS and Windows contributors don't rewrite each other's line endings.
+* text=auto
+
+# These run under zsh or sh, and break with Windows line endings.
+*.sh text eol=lf
+*.zsh text eol=lf
+shell/bin/* text eol=lf
+
+*.icns binary
+*.png binary

@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  macos:
     runs-on: macos-15
     timeout-minutes: 20
     steps:
@@ -33,3 +33,14 @@ jobs:
         run: zsh ShellTests/test_wrapper.zsh
       - name: cpm tests
         run: zsh ShellTests/test_cpm.zsh
+
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: windows/global.json
+      - name: Build and test
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File windows\build.ps1 -Test

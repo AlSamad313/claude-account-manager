@@ -24,6 +24,8 @@ Press **Guide** in the app for a short manual.
 Early. It has been tested by hand on one Mac, on macOS 26 with Claude Code 2.1.296. Other versions may work, and
 reports are welcome. Because Claude Code's file formats aren't a public API, an update to Claude Code can break this tool.
 
+A **Windows version is in progress** in [`windows/`](windows/README.md). So far it has `cpm` and the `claude` and `claude-as` wrappers, built from source. The rest of this page describes the Mac version.
+
 ## Requirements
 
 - macOS 14 or later, on Apple Silicon or Intel
@@ -123,6 +125,7 @@ To report a security problem, see [SECURITY.md](SECURITY.md).
 | [docs/E2E-checklist.md](docs/E2E-checklist.md) | The hands-on test script |
 | [docs/S0-checklist.md](docs/S0-checklist.md), [docs/S0-results.md](docs/S0-results.md) | Checks against real Claude Code behaviour |
 | [docs/designs/](docs/designs/) | The original design and its review history |
+| [windows/README.md](windows/README.md) | The Windows version: status, building and layout |
 | [CHANGELOG.md](CHANGELOG.md) | What changed |
 
 ## License

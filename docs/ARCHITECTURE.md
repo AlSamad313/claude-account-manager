@@ -2,6 +2,8 @@
 
 How the code fits together, and the rules it has to keep. For the reasoning behind each decision, see [the design](designs/claude-profile-manager.md).
 
+This page describes the macOS code. The Windows version in `windows/` has its own code and keeps the same safety rules. [Its design](designs/claude-profile-manager-windows.md) lists what differs, such as the login being a file instead of a Keychain item.
+
 ## The main idea
 
 Claude Code keeps its login and data in one folder, which `CLAUDE_CONFIG_DIR` can point elsewhere. It names the Keychain item after that folder, so each folder has its own login.
