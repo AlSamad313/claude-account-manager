@@ -261,6 +261,16 @@ import Testing
         #expect(r.exitCode == 0 && r.stdout == "1\nunset\n" && r.stderr == "err\n")
     }
 
+    /// With every shared worker thread busy, output must still arrive. CI found this on a small machine.
+    @Test func capturesOutputWhileTheSharedThreadPoolIsBusy() {
+        let release = DispatchSemaphore(value: 0)
+        let count = 1024
+        for _ in 0..<count { DispatchQueue.global().async { release.wait(); release.signal() } }
+        defer { release.signal() }
+        let r = ProcessRunner().run(executable: "/bin/sh", args: ["-c", "echo out; echo err >&2"], env: nil, timeout: 5)
+        #expect(r.stdout == "out\n" && r.stderr == "err\n")
+    }
+
     @Test func timesOut() {
         let r = ProcessRunner().run(executable: "/bin/sleep", args: ["10"], env: nil, timeout: 0.2)
         #expect(r.timedOut)
