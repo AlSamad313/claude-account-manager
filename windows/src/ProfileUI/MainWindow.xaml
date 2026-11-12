@@ -1,0 +1,140 @@
+<Window x:Class="ProfileUI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:ProfileUI"
+        Title="Claude Profiles" Width="1000" Height="620" MinWidth="720" MinHeight="420">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/ProfileUI;component/Rows.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <!-- Kept here, not inside the item style: WPF cannot connect Click handlers in a style's
+                 setter value, and the window failed to open. One menu per row (x:Shared). -->
+            <ContextMenu x:Key="SidebarMenu" x:Shared="False">
+                <MenuItem Header="New Terminal" Click="SidebarNewTerminal" />
+                <MenuItem Header="Open VS Code" Click="SidebarVSCode" />
+                <MenuItem Header="Make default" Click="SidebarMakeDefault" />
+                <MenuItem Header="Finish sign-in" Click="SidebarFinish" />
+                <MenuItem Header="Sign in" Click="SidebarSignIn" />
+                <Separator />
+                <MenuItem Header="Settings…" Click="SidebarSettings" />
+            </ContextMenu>
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid>
+        <Grid x:Name="Main">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="250" MinWidth="180" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Sidebar -->
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Bottom" Margin="8">
+                    <Button Content="Add profile…" HorizontalAlignment="Stretch" Click="Add" />
+                </StackPanel>
+                <ListBox x:Name="SidebarList" ItemsSource="{Binding Sidebar}" SelectionChanged="SidebarChanged" BorderThickness="0"
+                         Background="Transparent" Margin="4,8,4,0" AutomationProperties.Name="Profiles">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type ui:SidebarItem}">
+                            <Grid Margin="2,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse Style="{StaticResource Dot}" Fill="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                                <StackPanel Grid.Column="1" Margin="9,0,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="  default" Style="{StaticResource Secondary}" Visibility="{Binding IsDefault, Converter={StaticResource Shown}}" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Secondary}" />
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                            <EventSetter Event="ContextMenuOpening" Handler="SidebarMenuOpening" />
+                            <Setter Property="ContextMenu" Value="{StaticResource SidebarMenu}" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1" Width="1" HorizontalAlignment="Stretch" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+
+            <!-- Sessions -->
+            <DockPanel Grid.Column="2">
+                <DockPanel DockPanel.Dock="Top" Margin="12,10,12,6">
+                    <Menu DockPanel.Dock="Right" Background="Transparent" VerticalAlignment="Center" Margin="6,0,0,0">
+                        <MenuItem Header="More" Padding="8,4">
+                            <MenuItem Header="Set up command line…" Click="Shell" />
+                            <MenuItem Header="Copy setup…" Click="CopySetup" />
+                            <MenuItem Header="Doctor" Click="Doctor" />
+                            <MenuItem Header="Guide" InputGestureText="F1" Click="Guide" />
+                            <MenuItem Header="Refresh" InputGestureText="F5" Click="RefreshClick" />
+                        </MenuItem>
+                    </Menu>
+                    <Button x:Name="NewTerminalButton" DockPanel.Dock="Right" Content="{Binding TargetName}" Style="{DynamicResource AccentButtonStyle}"
+                            Margin="6,0,0,0" Click="NewTerminal" IsEnabled="{Binding ShellInstalled}" />
+                    <TextBox x:Name="SearchBox" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" MaxWidth="360" HorizontalAlignment="Left"
+                             MinWidth="220" AutomationProperties.Name="Search sessions" ToolTip="Search titles, folders and profiles (Ctrl+F)" />
+                </DockPanel>
+
+                <TextBlock DockPanel.Dock="Bottom" Text="{Binding WindowStatusLine}" Style="{StaticResource Secondary}" Margin="12,4,12,8" />
+
+                <ui:MessageBanners DockPanel.Dock="Top" />
+                <Border DockPanel.Dock="Top" Style="{StaticResource Caution}" Visibility="{Binding ShowShellNotice, Converter={StaticResource Shown}}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Set up" Style="{StaticResource Small}" Click="Shell" VerticalAlignment="Center" />
+                        <TextBlock Style="{StaticResource Wrapped}" Text="Set up command line first. The app starts every session through claude-as." />
+                    </DockPanel>
+                </Border>
+
+                <DataGrid x:Name="Sessions" ItemsSource="{Binding WindowSessions}" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
+                          HeadersVisibility="Column" GridLinesVisibility="None" CanUserReorderColumns="False" Margin="12,0"
+                          PreviewKeyDown="SessionsKey" SelectionChanged="SessionsSelected" MouseDoubleClick="SessionsDoubleClick" ContextMenuOpening="SessionsMenuOpening"
+                          AutomationProperties.Name="Sessions">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Header="Session" Width="2*" SortMemberPath="Title">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate DataType="{x:Type ui:SessionItem}">
+                                    <StackPanel Orientation="Horizontal" Margin="4,2">
+                                        <Ellipse Style="{StaticResource Dot}" Width="8" Height="8" Fill="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                                        <TextBlock Text="{Binding Title}" Margin="8,0,0,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Profile" Binding="{Binding ProfileName}" Width="120" />
+                        <DataGridTextColumn Header="Folder" Binding="{Binding Folder}" Width="1.5*" />
+                        <DataGridTextColumn Header="Last activity" Binding="{Binding When}" Width="150" SortMemberPath="Row.LastActivity" />
+                    </DataGrid.Columns>
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem x:Name="ResumeItem" Header="Resume" InputGestureText="Enter" Click="ResumeClick" />
+                            <MenuItem x:Name="StopItem" Header="Stop…" InputGestureText="Delete" Click="StopClick" />
+                            <Separator />
+                            <MenuItem Header="Copy folder path" Click="CopyFolder" />
+                            <MenuItem Header="Copy session ID" Click="CopyId" />
+                            <MenuItem Header="Open folder in File Explorer" Click="OpenFolder" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                </DataGrid>
+            </DockPanel>
+        </Grid>
+
+        <!-- Flows are shown over the window, like a sheet. -->
+        <Grid x:Name="Overlay" Visibility="{Binding IsFlow, Converter={StaticResource Shown}}">
+            <Rectangle Fill="Black" Opacity="0.35" />
+            <Border Width="460" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="8" MaxHeight="560"
+                    Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ui:FlowView />
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

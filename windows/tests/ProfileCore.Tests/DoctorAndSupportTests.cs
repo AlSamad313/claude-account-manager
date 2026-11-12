@@ -223,6 +223,23 @@ public sealed class SupportTests
             Assert.AreEqual(Path.Combine(real, "claude.exe"), new ClaudeBinaryLocator(s.Locator, $"{spelling};;{real}").RealBinary(), spelling);
     }
 
+    /// Another copy of the wrapper, such as an installed copy seen from a test home, is never taken for
+    /// Claude Code: running it would start the wrapper again.
+    [TestMethod]
+    public void SkipsAnotherCopyOfTheWrapper()
+    {
+        using var s = new Sandbox();
+        var other = s.PathOf("other-install\\bin");
+        Directory.CreateDirectory(other);
+        File.WriteAllText(Path.Combine(other, "claude.exe"), "");
+        File.WriteAllText(Path.Combine(other, "claude-as.exe"), "");
+        var real = s.PathOf("real");
+        Directory.CreateDirectory(real);
+        File.WriteAllText(Path.Combine(real, "claude.exe"), "");
+        Assert.AreEqual(Path.Combine(real, "claude.exe"), new ClaudeBinaryLocator(s.Locator, $"{other};{real}").RealBinary());
+        Assert.IsNull(new ClaudeBinaryLocator(s.Locator, other).RealBinary());
+    }
+
     [TestMethod]
     public void NeverPicksAScript()
     {
@@ -239,11 +256,12 @@ public sealed class SupportTests
     public void ParsesProcStartAsFileTime()
     {
         // S0 check C9: a JSON string of digits.
-        using var doc = JsonDocument.Parse("""{"a":"134382630457202312","b":134382630457202312,"c":"Wed Nov  4 10:50:45 2026"}""");
+        using var doc = JsonDocument.Parse("""{"a":"134382630457202312","b":134382630457202312,"c":"Wed Nov  4 10:50:45 2026","d":"soon"}""");
         var expected = DateTime.FromFileTimeUtc(134382630457202312);
         Assert.AreEqual(expected, LiveSessionReader.ParseProcStart(doc.RootElement.GetProperty("a")));
         Assert.AreEqual(expected, LiveSessionReader.ParseProcStart(doc.RootElement.GetProperty("b")));
-        Assert.IsNull(LiveSessionReader.ParseProcStart(doc.RootElement.GetProperty("c")));
+        Assert.AreEqual(new DateTime(2026, 11, 4, 10, 50, 45, DateTimeKind.Utc), LiveSessionReader.ParseProcStart(doc.RootElement.GetProperty("c")));
+        Assert.IsNull(LiveSessionReader.ParseProcStart(doc.RootElement.GetProperty("d")));
         Assert.AreEqual(new DateTime(2026, 11, 4, 10, 50, 45, DateTimeKind.Utc), new DateTime(expected.Ticks - expected.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc));
     }
 
@@ -307,7 +325,8 @@ public sealed class SupportTests
     }
 
     // With every shared worker thread busy, output must still arrive. CI found this on a small machine.
-    [TestMethod]
+    // Alone, because it starves the pool that file-watcher and timing tests running beside it need.
+    [TestMethod, DoNotParallelize]
     public void RunnerCapturesOutputWhileTheThreadPoolIsBusy()
     {
         // Not disposed: queued work may still reach it after the test ends.
@@ -336,7 +355,7 @@ public sealed class SupportTests
         Assert.AreEqual(3, r.ExitCode);
     }
 
-    [TestMethod]
+    [TestMethod, DoNotParallelize] // starts ping, which the process-tree tests count
     public void RunnerTimesOut()
     {
         var t = System.Diagnostics.Stopwatch.StartNew();

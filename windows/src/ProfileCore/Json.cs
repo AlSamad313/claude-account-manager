@@ -8,6 +8,7 @@ namespace ProfileCore;
 [JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(Registry))]
+[JsonSerializable(typeof(BackupManifest))]
 internal partial class CoreJson : JsonSerializerContext;
 
 /// ISO 8601 in UTC with whole seconds, as Swift's .iso8601 strategy writes and reads.

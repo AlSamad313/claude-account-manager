@@ -1,0 +1,13 @@
+<Project Sdk="MSTest.Sdk">
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- WPF0001: the Fluent theme the app uses is marked experimental in .NET 10. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ProfileUI\ProfileUI.csproj" />
+    <!-- The same temporary home and fakes as the ProfileCore tests. -->
+    <Compile Include="..\ProfileCore.Tests\TestSupport.cs" Link="TestSupport.cs" />
+  </ItemGroup>
+</Project>

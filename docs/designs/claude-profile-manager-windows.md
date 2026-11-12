@@ -106,7 +106,7 @@ Each decision below says which way it went and why.
     two lines to paste. Windows users expect a setup step to do this, and nothing on Windows matches
     "paste this into your shell file". The risk that made macOS print the lines is handled
     differently: the tool only adds or removes its own one entry, writes the old value to
-    `writes.log` first, and `cpm uninstall` takes the entry out again. Tab completion in PowerShell
+    `writes.log` first, and `cpm uninstall-shell` takes the entry out again. Tab completion in PowerShell
     is a checkbox, off by default, because it means editing the user's own `$PROFILE` file (flow 10).
     Alternative P.
 *   **D2. Stop never forces a session to end.** Same as macOS, which sends SIGINT, then SIGTERM, and
@@ -156,7 +156,7 @@ parts and order, so the two can be compared.
 | macOS | Windows |
 | --- | --- |
 | Coloured dot in the menu bar, in the default profile's colour; no Dock icon | Coloured dot in the notification area, in the default profile's colour. Hovering shows "Claude Profiles — plain claude uses <name>". The panel has no taskbar button. Windows first puts new icons in the overflow (^) area; the first-run notification says how to pin it |
-| Click the dot: a 400-point-wide panel | Left-click the dot: the same panel, 400 px wide, above the tray like the Wi-Fi flyout (D7). It closes on Esc or when it loses focus. Right-click shows the usual tray menu: Open Claude Profiles, Start with Windows (tick), Exit |
+| Click the dot: a 400-point-wide panel | Left-click the dot: the same panel, 460 px wide so its footer fits, above the tray like the Wi-Fi flyout (D7). It closes on Esc or when it loses focus. Right-click shows the usual tray menu: Open Claude Profiles, Start with Windows (tick), Exit |
 | Panel: "Claude Profiles", "plain claude uses <name>", "Filter by title, folder or profile", "Set up shell first" notice, profile rows, session rows, footer Add profile…, Open window…, Copy setup…, Doctor, Quit | The same text and order, with Windows words: "Set up command line" instead of "Set up shell", Exit instead of Quit |
 | No sign-in alert; the step shows when you open the panel | A Windows notification when a sign-in is seen; clicking it opens that step (D8) |
 | Light or dark from macOS | Light or dark and accent colour from Windows (D7) |
@@ -333,7 +333,8 @@ Code from replacing it.
 
 **Completion.** `bin\claude-profiles.ps1` registers an argument completer for `claude-as` that
 reads names from `names`, as `claude-profiles.zsh` does for zsh. It does nothing if `names` cannot
-be read. The user adds one line to their PowerShell profile to load it (flow 10). Command Prompt has
+be read. If the user ticks the completion checkbox in "Set up command line", one marked line in their
+PowerShell profile loads it (D1, flow 10). Command Prompt has
 no completion. Git Bash is not covered in v1.
 
 ### Flow 2: launching from the app
@@ -366,7 +367,7 @@ The wrapper, in launch mode:
 2. Changes to `folder`. If it is missing: prints "Folder not found: <folder>", waits for Enter, exits 1.
 3. Runs the claude-as rules for commandName and arguments, exactly as flow 1.
 4. When Claude Code exits with code 0: the wrapper exits and the window closes.
-   With any other code: prints "Claude Code ended with code <n>. Press Enter to close." and waits.
+   With any other code: prints "Ended with code <n>. Press Enter to close." and waits.
 ```
 
 Step 4 follows D6. A window closing when its program ends normally is what Windows users expect.
@@ -485,7 +486,9 @@ sent from a process attached to the same console.
 6.   Still alive: report "did not stop" and give the PID. Nothing stronger is sent (D2).
 7.   Ended: list any of the session's child processes, recorded before step 3, that are still
      running, such as a shell command a busy session had started. Show their names and PIDs, and
-     say they were left running. They are never ended by the tool.
+     say they were left running. They are never ended by the tool. "Child processes" includes
+     those on a hidden console a session process owns (bin\claude.exe --console-processes),
+     because Git Bash leaves its commands with no living parent (stage W2 as built).
 8.   Log the result.
 ```
 
@@ -783,6 +786,153 @@ needs them: `UserPath.cs` (for `cpm install-shell`), `LiveSessionReader.cs` (`cp
 a session is live) and a first `RecycleBin.cs` (`cpm discard`, with `SHFileOperation`). `WinProcess.cs`
 holds every Windows call made so far. `cpm` answers the stage W1 commands, plus `uninstall-shell`, and
 names the later stage for the rest.
+
+**Stage W2 as built (2026-11-05).** `cpm list`, `new`, `resume` and `stop` work, and were run against
+real Claude Code sessions in a test folder. Changes from the plan:
+
+*   The wrapper has a third helper mode, `--console-processes <pid>`, for flow 9 step 7. Claude Code
+    runs each command through Git Bash, which starts it by way of a process that exits at once, so
+    a running `sleep` has no living parent and a walk of parent PIDs never finds it. It stays on the
+    hidden console of the `bash.exe` that started it. Step 7 therefore also lists the processes on
+    any console owned by one of the session's processes, through the helper (it attaches, so it
+    must not run in `cpm`). The session's own console is skipped, because the user's shell is on it.
+*   Claude Code writes the status `shell` while a command runs. Stop warns that the command may keep
+    running, as well as the `busy` warning about an unfinished edit.
+*   Flow 2 step 4 prints "Ended with code <n>. Press Enter to close.", because an ownership refusal
+    ends before Claude Code starts.
+*   The `procStart` parser also reads the macOS date string, as flow 4 says.
+*   `scripts/measure-panel.ps1`: 0.1 s for 5,000 transcripts once the files have been read once. The
+    first read of freshly written files took 1.0 to 1.2 s, probably antivirus scanning each new file
+    on first open; not proven.
+
+**Stage W3 as built (2026-11-05).** The tray app, panel and window are built, and pass a build and unit-test
+run. The hands-on E2E parts for the app (1, 2.1, 3, 4.8, 4.9, 5.7, 5.9, 7, 9) have not been run yet. Changes from
+the plan:
+
+*   `src/ProfileUI` holds the shared `AppModel`, the panel, the flow steps and the window. `src/ClaudeProfiles`
+    holds only what is tied to the tray: `App.xaml.cs` (one copy, the signals), `TrayIcon.cs`, `PanelWindow.cs`,
+    `StartupSetting.cs` (also the app's own values and the window's place) and `AppInstall.cs`. The balloon
+    call lives in `TrayIcon.cs`, so there is no `Notifications.cs`.
+*   `build.ps1 -Install` installs the app and no longer runs `cpm install-shell`. The `PATH` change is the
+    user's choice, in the app's "Set up command line" step (D1). The app refreshes `bin\` from its own `tools\`
+    copy when it starts, but only when the shell layer is already installed, and only for files whose bytes
+    differ. It does not compare `bin\VERSION`.
+*   The app has three more modes: `--exit` (asks a running copy to exit; `build.ps1 -Install` uses it before it
+    replaces the files), `--register` and `--uninstall-app`. The startup value runs it with `--background`,
+    which does not open the panel unless the shell layer is missing. `--uninstall-app` deletes the app folder
+    only when the app runs from `%LOCALAPPDATA%\Programs\ClaudeProfiles`.
+*   Starting a second copy passes its right to bring a window to the front to the running copy
+    (`AllowSetForegroundWindow`) before it signals. Without that, the running copy's panel opened without focus
+    and hid itself at once, because it closes on losing focus.
+*   The panel is a fixed 460 × 620 (400 wide until W4, 440 in W4), clamped to the work area, in the corner of the work area at the taskbar's
+    tray end. It does not size itself to its content.
+*   The panel and the window both show the current flow step, as on macOS (E2E 7.9). A step is built only in a
+    host that is visible, so the work a step starts when it opens (Doctor, the sign-in check) runs once. A hidden
+    host keeps its step, so text typed in Add profile survives the panel closing.
+*   The lists are replaced only when what they show changed, so the window keeps its selection and focus
+    across the 2-second rechecks.
+*   An unexpected error in the app is shown and written to `logs\writes.log` as an `error` line, and the app
+    keeps running.
+*   The app ID (for the notification's name) is set only when the Start menu shortcut exists. Run from
+    `build\app`, notifications show "ClaudeProfiles".
+*   The published app is self-contained (WPF cannot use Native AOT): 156 MB in 256 files, with only English
+    resources. Its icon is a placeholder drawn by `scripts/make-icon.ps1` (three overlapping profile dots), until the
+    real one is supplied; replacing `src/ClaudeProfiles/app.ico` is enough.
+*   Automated UI tests. `tests/ProfileUI.Tests` renders the real panel, flow steps and window over a
+    temporary home and presses controls through UI Automation (`ViewTests.cs`, one test per E2E step it
+    covers). `AppProcessTests.cs` starts the built `ClaudeProfiles.exe` as a test copy and drives it the
+    same way: first-start panel, Doctor, Add profile, one copy, `--window`, `--exit`, idle CPU. A test copy
+    is one started with `CLAUDE_PROFILES_TEST_INSTANCE=<name>`: its instance names and settings key get
+    that suffix, so it runs beside an installed copy. It cannot register or uninstall, shows no
+    notifications, never changes Start with Windows, and its panel stays open without focus. These tests
+    found that the window failed to open: Click handlers inside the sidebar's item style cannot be
+    connected by WPF, so its right-click menu is now a window resource.
+*   `ClaudeProfiles.exe --window` opens the window, of the running copy if there is one.
+*   Measured on a test home, Debug build: about 0.03 CPU seconds per 10 seconds while hidden, and 171 MB
+    working set. The Release build is measured in E2E 7.11 against the target of under 100 MB.
+
+**Stage W4 as built (2026-11-05).** Copy setup works from the panel (footer Copy setup…) and the window
+(More > Copy setup…), with the macOS table, defaults, wording and two steps. `ProfileCore/SetupCopier/`
+is a port of the Swift files, and its tests are the Swift tests, case for case. Changes from macOS:
+
+*   The JSON files are read and written as plain trees (`JsonTree`, over `System.Text.Json.Nodes`), so
+    unknown keys survive and `cpm` still compiles ahead of time. A written `settings.json` has its keys
+    sorted, as the Swift encoder writes it.
+*   "Points into the source profile's folder" looks at every string in the server's command and
+    arguments, or in the new hooks. It matches with either slash and in any case. It also matches the 8.3
+    short form at every level, such as a short home folder with a long `.claude` after it, and `~`,
+    `%USERPROFILE%`, `$env:USERPROFILE` and `$HOME` forms. The folder name must end where it is found,
+    so `.claude` does not match `.claude-profiles`.
+*   A symbolic link or junction in a skill is followed, and a loop or a broken link is skipped.
+    `desktop.ini` and `Thumbs.db` are never copied.
+*   A read-only file in the target is made writable before it is replaced; its backup records the
+    attribute, and Restore puts it back. Restore only touches files inside the profile's own folder,
+    whatever a manifest says.
+*   Backups are under `.claude-profiles\backups`, inside the user's profile folder, so its permissions
+    keep them private. There is no separate mode to set.
+*   The removal commands for what Claude Code installed are `claude-as <command> mcp remove <name>
+    --scope user` and `claude-as <command> plugin uninstall <name>`, which work in PowerShell and
+    Command Prompt alike.
+*   With `CPM_REAL_CLAUDE` set to the folder holding the real `claude.exe`, a test runs real `claude
+    mcp add-json` and `mcp remove` in a throwaway profile folder. It passed with Claude Code on this PC:
+    a dropped secret stays out, and arguments with spaces and quotes survive the Windows command line.
+*   The panel is now 440 px wide, so its five footer buttons fit on one row. The footer wraps instead of
+    cutting a button off when Windows text is set larger. A UI test checks the fit.
+*   A tick or a secret's tick works through UI Automation too, as screen readers use, and keeps keyboard
+    focus on the box.
+
+**From macOS 41bf56e (2026-11-05).** Three app changes from the Mac commit "Add open-source prep, menu-bar
+icon, Guide and release packaging" are ported:
+
+*   **New Terminal asks for a folder.** Every New Terminal (panel row, window button, Ctrl+T, sidebar menu)
+    opens Windows' folder picker, titled "Choose a folder for the <name> session". Cancel starts nothing.
+    The picker opens in the home folder the first time, then where the user was last, which Windows
+    remembers. The panel stays open behind it. `AppModel.ChooseFolder` is replaced in tests.
+*   **Guide.** Panel footer Guide, and More > Guide or F1 in the window. The same eleven topics as macOS
+    (`GuideTopic.All`), one open at a time, in Windows words: terminal window, tray icon, Select Folder,
+    Close VS Code. "Rename or remove" is "Rename a profile" until Remove comes in W5, and "Good to know"
+    says the app starts with Windows. A test keeps each line short, free of `@`, and free of macOS words.
+    The panel is 460 px wide so the sixth footer button fits.
+*   **Icons.** The tray icon is now the macOS menu-bar icon: the burst from the shared
+    `Resources/BurstMask.png` on a rounded square in the default profile's colour, in white, or dark grey on
+    colours lighter than 0.72 luminance (`ProfileUI/TrayImage.cs`). It is drawn at the tray's size for the
+    current DPI. The app icon (`windows/scripts/make-icon.ps1`, `app.ico`) is the macOS app icon: the
+    burst on a fixed orange (#D97857) square, with a smaller margin at 32 px and below. Both read the mask
+    from `Resources/`, so a new mask reaches both apps.
+*   **Finding the real Claude Code** also skips any `PATH` folder that holds `claude-as.exe`, as well as
+    the tool's own bin folder. Real Claude Code never ships that file, so another copy of the wrapper (an
+    installed copy seen from a test home, say) is never run as Claude Code. The macOS locator skips only
+    its own bin folder.
+
+**Stage W5 as built (2026-11-05).** Removing a profile works from the app (Settings… > Remove…, then
+Remove profile) and from `cpm remove <name> [--yes]`, and `cpm uninstall [--yes]` removes everything
+but the built-in profile. `ProfileCore/ProfileRemover.cs` is a port of the Swift file, and its tests are
+the Swift tests, case for case. Changes from macOS:
+
+*   No Keychain step. After `claude auth logout`, `.credentials.json` is deleted outright if it is still
+    there, so a login never reaches the Recycle Bin (flow 7 step 5). It is deleted even when logout
+    fails, which is then a warning.
+*   Logout runs only when the folder exists and the profile was signed in, so resuming a removal never
+    recreates a folder that is already gone.
+*   The remover refuses a profile whose folder is not inside `.claude-profiles\profiles\`, before it
+    changes anything.
+*   The folder and its backups go to the Recycle Bin (`RecycleBin.Move`, `SHFileOperation`). On a drive
+    without one, removal stops and the profile stays `deleting`; the next reconcile tries again. The
+    reconciler reports a removal that still fails as a notice, instead of failing to start.
+*   `cpm uninstall` refuses, before changing anything, while the app runs (it holds a named mutex), as the
+    app would recreate `.claude-profiles`, or while any added profile has a live session. It then removes
+    each added profile, takes the bin folder out of the user `PATH` and the marked line out of
+    `$PROFILE`, removes the Start with Windows value, and moves everything in `.claude-profiles` except
+    `bin` to the Recycle Bin. `bin` holds only copies of the tool, and cpm itself runs from it, so it is
+    deleted outright: what can go goes at once, and a hidden `cmd` deletes the rest a few seconds after cpm
+    exits, then removes `.claude-profiles` if that leaves it empty. It does nothing for a path holding
+    characters cmd could misread, and says to delete the folder by hand.
+*   The `$PROFILE` line and the startup value are found by their marker and name, not by the home
+    folder, so `cpm uninstall` must not be run with a test `USERPROFILE`. Tests replace both.
+*   Uninstalling from Installed apps now says that `cpm uninstall` removes the profiles and tools.
+*   The Guide topic is "Rename or remove", as on macOS, with Recycle Bin for Trash.
+*   A test using the real Recycle Bin runs only with `CPM_REAL_RECYCLE_BIN=1`, since other tests never
+    touch it.
 
 **Tests to port first.** These carry the rules, so each Swift test has a C# case with the same name:
 the ownership check on `--resume`, a broken `default` stopping plain `claude`, the built-in profile

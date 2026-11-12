@@ -3,10 +3,13 @@
     <Project Path="src/ProfileCore/ProfileCore.csproj" />
     <Project Path="src/Wrapper/Wrapper.csproj" />
     <Project Path="src/Cpm/Cpm.csproj" />
+    <Project Path="src/ProfileUI/ProfileUI.csproj" />
+    <Project Path="src/ClaudeProfiles/ClaudeProfiles.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ProfileCore.Tests/ProfileCore.Tests.csproj" />
     <Project Path="tests/Wrapper.Tests/Wrapper.Tests.csproj" />
+    <Project Path="tests/ProfileUI.Tests/ProfileUI.Tests.csproj" />
     <Project Path="tests/FakeClaude/FakeClaude.csproj" />
   </Folder>
 </Solution>

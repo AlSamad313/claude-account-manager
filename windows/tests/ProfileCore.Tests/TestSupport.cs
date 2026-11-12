@@ -79,6 +79,9 @@ sealed class FakeProcesses : IProcessInfo
 {
     public Dictionary<int, DateTime?> Running { get; } = [];
     public HashSet<int> Denied { get; } = [];
+    public Dictionary<int, List<ProcEntry>> Children { get; } = [];
+
+    public IReadOnlyList<ProcEntry> Descendants(int pid, Func<int, IReadOnlyList<int>>? consoleMembers = null) => Children.TryGetValue(pid, out var c) ? c : [];
 
     public (WinProcess.ProcessCheck State, DateTime? Start) Query(int pid) =>
         Denied.Contains(pid) ? (WinProcess.ProcessCheck.AccessDenied, null)

@@ -1,0 +1,31 @@
+<ui:FlowBase x:Class="ProfileUI.ShellSetupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:ProfileUI">
+    <ui:FlowBase.Resources>
+        <ResourceDictionary Source="/ProfileUI;component/Theme.xaml" />
+    </ui:FlowBase.Resources>
+    <StackPanel>
+        <TextBlock Text="Set up command line" Style="{StaticResource FlowTitle}" />
+        <StackPanel x:Name="Ask">
+            <TextBlock Style="{StaticResource Wrapped}"
+                       Text="The app starts sessions through claude-as, so nothing can launch until the command line tools are set up. This copies claude, claude-as and cpm to .claude-profiles\bin, and puts that folder first in your user PATH. The old PATH is saved in logs\writes.log, and cpm uninstall-shell takes the entry out again." />
+            <CheckBox x:Name="Completion" Margin="0,12,0,0">
+                <TextBlock Style="{StaticResource Wrapped}" Text="Also add tab completion for claude-as to my PowerShell profile (one marked line)" />
+            </CheckBox>
+            <StackPanel Style="{StaticResource ButtonRow}">
+                <Button x:Name="SetUpButton" Content="Set up" IsDefault="True" Style="{DynamicResource AccentButtonStyle}" MinWidth="88" Click="SetUp" />
+                <Button Content="Cancel" IsCancel="True" Style="{StaticResource DialogButton}" Click="Home" />
+            </StackPanel>
+        </StackPanel>
+        <StackPanel x:Name="Finished">
+            <TextBlock Text="Done. Open a new terminal window to use claude-as." Style="{StaticResource Wrapped}" FontWeight="SemiBold" />
+            <TextBlock x:Name="Details" Style="{StaticResource Wrapped}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,6,0,0" />
+            <StackPanel Style="{StaticResource ButtonRow}">
+                <Button Content="Done" IsDefault="True" IsCancel="True" Style="{DynamicResource AccentButtonStyle}" MinWidth="88" Click="Finish" />
+            </StackPanel>
+        </StackPanel>
+        <TextBlock Text="{Binding ErrorText}" Style="{StaticResource Error}" Margin="0,10,0,0"
+                   Visibility="{Binding ErrorText, Converter={StaticResource Shown}}" />
+    </StackPanel>
+</ui:FlowBase>

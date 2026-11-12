@@ -6,15 +6,21 @@ public sealed class ReconcileResult
     public List<string> RowsWithoutFolder { get; } = [];
     public List<string> LoginNotices { get; } = [];
     public List<string> AccountNotices { get; } = [];
+    public List<string> RemovalsResumed { get; } = [];
+    public List<string> RemovalWarnings { get; } = [];
 }
 
 /// Runs when the app or cpm starts. It never completes a login.
-public sealed class Reconciler(ProfileStore store, LoginCoordinator login)
+public sealed class Reconciler(ProfileStore store, LoginCoordinator login, ProfileRemover? remover = null)
 {
     public ReconcileResult Run()
     {
         var result = new ReconcileResult();
         store.RepairFiles();
+        // A removal that still fails (say, a file held open) stays `deleting` and is tried again next time.
+        if (remover != null)
+            try { foreach (var r in remover.ResumePending()) { result.RemovalsResumed.Add(r.DisplayName); result.RemovalWarnings.AddRange(r.Warnings); } }
+            catch (ProfileException e) { result.RemovalWarnings.Add(e.Message); }
         var registry = store.Load();
         var l = store.Locator;
 

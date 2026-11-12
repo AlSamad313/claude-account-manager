@@ -1,0 +1,31 @@
+<ui:FlowBase x:Class="ProfileUI.AddProfileView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:ProfileUI">
+    <ui:FlowBase.Resources>
+        <ResourceDictionary Source="/ProfileUI;component/Theme.xaml" />
+    </ui:FlowBase.Resources>
+    <StackPanel>
+        <TextBlock Text="Add profile" Style="{StaticResource FlowTitle}" />
+        <TextBlock Text="Display name" FontSize="12" Margin="0,8,0,4" />
+        <TextBox x:Name="NameBox" TextChanged="NameChanged" AutomationProperties.Name="Display name" />
+        <TextBlock Text="Command name" FontSize="12" Margin="0,10,0,4" />
+        <Grid>
+            <TextBox x:Name="CommandBox" TextChanged="CommandChanged" AutomationProperties.Name="Command name" />
+            <TextBlock x:Name="CommandHint" IsHitTestVisible="False" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource Secondary}" />
+        </Grid>
+        <TextBlock x:Name="CommandNote" Style="{StaticResource Secondary}" Margin="0,4,0,0" TextWrapping="Wrap" />
+        <TextBlock Text="Colour" FontSize="12" Margin="0,10,0,6" />
+        <ui:Swatches x:Name="ColorPicker" />
+        <TextBlock Text="Set up the command line first, because sign-in runs through claude-as." Style="{StaticResource Wrapped}"
+                   Foreground="{DynamicResource SystemFillColorCautionBrush}" Margin="0,10,0,0"
+                   Visibility="{Binding ShowShellNotice, Converter={StaticResource Shown}}" />
+        <StackPanel Style="{StaticResource ButtonRow}">
+            <Button x:Name="ContinueButton" Content="Continue to sign-in" IsDefault="True" Style="{DynamicResource AccentButtonStyle}"
+                    MinWidth="88" Click="Continue" />
+            <Button Content="Cancel" IsCancel="True" Style="{StaticResource DialogButton}" Click="Cancel" />
+        </StackPanel>
+        <TextBlock Text="{Binding ErrorText}" Style="{StaticResource Error}" Margin="0,10,0,0"
+                   Visibility="{Binding ErrorText, Converter={StaticResource Shown}}" />
+    </StackPanel>
+</ui:FlowBase>

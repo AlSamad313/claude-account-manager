@@ -1,0 +1,31 @@
+<ui:FlowBase x:Class="ProfileUI.RemoveView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:ProfileUI">
+    <ui:FlowBase.Resources>
+        <ResourceDictionary Source="/ProfileUI;component/Theme.xaml" />
+    </ui:FlowBase.Resources>
+    <StackPanel>
+        <StackPanel x:Name="Ask">
+            <TextBlock x:Name="TitleText" Style="{StaticResource FlowTitle}" />
+            <Border x:Name="LiveBox" Style="{StaticResource Critical}">
+                <TextBlock Style="{StaticResource Wrapped}" Text="This profile has a live session. Stop it first; removal is refused while one is running." />
+            </Border>
+            <TextBlock x:Name="ExplainText" Style="{StaticResource Wrapped}" />
+            <TextBlock x:Name="DefaultText" Style="{StaticResource Wrapped}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,6,0,0"
+                       Text="It is the default, so the built-in profile becomes the default first." />
+            <TextBlock Text="{Binding ErrorText}" Style="{StaticResource Error}" Margin="0,10,0,0"
+                       Visibility="{Binding ErrorText, Converter={StaticResource Shown}}" />
+            <StackPanel Style="{StaticResource ButtonRow}">
+                <Button x:Name="RemoveButton" Content="Remove profile" Style="{DynamicResource AccentButtonStyle}" MinWidth="88" Click="Remove" />
+                <Button Content="Cancel" IsCancel="True" IsDefault="True" Style="{StaticResource DialogButton}" Click="Cancel" />
+            </StackPanel>
+        </StackPanel>
+        <StackPanel x:Name="Gone">
+            <TextBlock Text="That profile is gone." />
+            <StackPanel Style="{StaticResource ButtonRow}">
+                <Button Content="Done" IsDefault="True" Style="{StaticResource DialogButton}" Click="Home" />
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</ui:FlowBase>

@@ -10,7 +10,9 @@ internal static class RealClaude
     static readonly string[] Scripts = ["claude.cmd", "claude.bat", "claude.ps1"];
 
     /// The first claude.exe on PATH, skipping any entry that is the bin folder however it is
-    /// spelled. A claude.cmd, .bat or .ps1 is never run; ScriptOnly names one if that is all there is.
+    /// spelled, and any other folder holding claude-as.exe: that is another copy of the wrapper, and
+    /// Claude Code never ships one. A claude.cmd, .bat or .ps1 is never run; ScriptOnly names one if
+    /// that is all there is.
     public static RealClaudeResult Find(string path, string binDir)
     {
         var own = PathCanon.Canonical(binDir);
@@ -20,6 +22,7 @@ internal static class RealClaude
             var entry = Clean(raw);
             if (entry == null) continue;
             if (PathCanon.Same(PathCanon.Canonical(entry), own)) continue;
+            if (File.Exists(Path.Combine(entry, "claude-as.exe"))) continue;
             var exe = Path.Combine(entry, "claude.exe");
             if (File.Exists(exe)) return new RealClaudeResult(exe, null);
             if (script == null)
