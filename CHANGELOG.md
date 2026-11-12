@@ -1,8 +1,8 @@
 # Changelog
 
-Newest first. There are no versioned releases yet.
+Newest first.
 
-## Unreleased
+## 0.1.0 (2026-11-13)
 
 ### Added
 
@@ -10,7 +10,7 @@ Newest first. There are no versioned releases yet.
 - A Guide button with a short manual, in the panel and the window.
 - A menu-bar icon that takes the default profile's colour, and a new app icon.
 - Contributor documentation, issue and pull request templates, and CI.
-- `scripts/make-release.sh`, which packs a universal app for download.
+- `scripts/make-release.sh`, which packs a universal app for download. It keeps the builder's home folder and username out of the binaries.
 - The start of a Windows version in `windows/`: `cpm` and the `claude` and `claude-as` wrappers.
 - CI on Windows, and line-ending rules so both platforms can work on the same files.
 
