@@ -11,7 +11,10 @@ mkdir -p "$out/bin"
 for product in ClaudeProfiles cpm; do
   inputs=()
   for arch in arm64 x86_64; do
-    swift build -c release --product "$product" --triple "$arch-apple-macosx14.0" --scratch-path ".build/release-$arch"
+    # Keep the builder's home folder, and so their username, out of the binaries: the prefix map
+    # makes source paths relative, and the linker's -S drops debug entries naming the object files.
+    swift build -c release --product "$product" --triple "$arch-apple-macosx14.0" --scratch-path ".build/release-$arch" \
+      -Xswiftc -file-prefix-map -Xswiftc "$PWD=." -Xlinker -S
     inputs+=("$(swift build -c release --triple "$arch-apple-macosx14.0" --scratch-path ".build/release-$arch" --show-bin-path)/$product")
   done
   lipo -create "${inputs[@]}" -output "$out/bin/$product"
