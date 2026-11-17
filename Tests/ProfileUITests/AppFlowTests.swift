@@ -90,13 +90,23 @@ private final class Harness {
         try Data(json.utf8).write(to: locator.configFile(for: p))
     }
 
-    func transcript(_ p: Profile, id: String, title: String, cwd: String, age: TimeInterval = 100) throws {
+    func transcript(_ p: Profile, id: String, title: String, cwd: String, age: TimeInterval = 100, replies: [(model: String, effort: String)] = [], costs: [String: Double] = [:],
+                    extra: [String] = []) throws {
         let dir = locator.configDir(for: p).appendingPathComponent("projects/proj")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appendingPathComponent(id + ".jsonl")
         let first = #"{"type":"user","cwd":"\#(cwd)","entrypoint":"cli","sessionId":"\#(id)"}"#
         let second = #"{"type":"ai-title","aiTitle":"\#(title)","sessionId":"\#(id)"}"#
-        try Data((first + "\n" + second + "\n").utf8).write(to: url)
+        let lines = replies.enumerated().map { i, r in
+            #"{"type":"assistant","perTurnEffort":"\#(r.effort)","timestamp":"2026-11-17T09:0\#(i):00.000Z","message":{"model":"\#(r.model)"}}"#
+        }
+        var all = [first, second] + lines + extra
+        if !costs.isEmpty {
+            let usage = costs.mapValues { ["costUSD": $0] }
+            let o: [String: Any] = ["type": "cost-state", "totalCostUSD": costs.values.reduce(0, +), "hasUnknownModelCost": false, "modelUsage": usage]
+            all.append(String(decoding: try JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]), as: UTF8.self))
+        }
+        try Data(all.joined(separator: "\n").appending("\n").utf8).write(to: url)
         try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: url.path)
     }
 
@@ -433,6 +443,39 @@ private final class Counter: @unchecked Sendable {
     func add() { lock.lock(); n += 1; lock.unlock() }
 }
 
+@Suite @MainActor struct SessionHistoryTests {
+    private let id = "11111111-2222-3333-4444-555555555555"
+
+    @Test func selectingASessionLoadsItsSwitches() async throws {
+        let h = try Harness()
+        let a = try h.store.create(displayName: "A", commandName: "a", color: "#000000")
+        try h.transcript(a, id: id, title: "T", cwd: "/w", replies: [("claude-opus-5-5", "medium"), ("claude-opus-5-5", "medium"), ("claude-fable-5-1", "max")],
+                         costs: ["claude-opus-5-5": 2, "claude-fable-5-1": 1.5])
+        await h.model.refresh()
+        #expect(h.model.rows.first?.cost?.totalUSD == 3.5)
+        #expect(h.model.rows.first?.setting == ModelSetting(model: "claude-fable-5-1", effort: "max"))
+        h.model.selectSession(id)
+        await h.settle()
+        #expect(h.model.history?.map(\.replies) == [2, 1])
+        #expect(h.model.history?.last?.setting.model == "claude-fable-5-1")
+        #expect(h.model.sessionCost?.byModel.first?.model == "claude-opus-5-5")
+        #expect(h.model.sessionDetails != nil)
+        h.model.selectSession(nil)
+        #expect(h.model.history == nil && h.model.sessionCost == nil && h.model.selectedRow == nil)
+    }
+
+    @Test func aSessionWithNoRepliesHasAnEmptyHistory() async throws {
+        let h = try Harness()
+        let a = try h.store.create(displayName: "A", commandName: "a", color: "#000000")
+        try h.transcript(a, id: id, title: "T", cwd: "/w")
+        await h.model.refresh()
+        h.model.selectSession(id)
+        await h.settle()
+        #expect(h.model.history == [])
+        #expect(h.model.rows.first?.setting == nil)
+    }
+}
+
 @Suite @MainActor struct GuideTests {
     @Test func everyTopicStaysShortAndHasNoPersonalDetails() {
         #expect(Set(GuideTopic.all.map(\.title)).count == GuideTopic.all.count)
@@ -526,6 +569,18 @@ private final class Counter: @unchecked Sendable {
         save(MenuPanelView(model: h.model, openWindow: {}), "panel", in: dir)
         save(GuideTopics().padding(10).frame(width: 400), "guide-closed", in: dir)
         save(GuideTopics(showAll: true).padding(10).frame(width: 400), "guide-open", in: dir)
+        let hid = "22222222-3333-4444-5555-666666666666"
+        try h.transcript(a, id: hid, title: "Refactor the session list", cwd: "/Users/me/Projects/my-app",
+                         replies: [("claude-opus-5-5", "medium"), ("claude-opus-5-5", "medium"), ("claude-fable-5-1", "medium"), ("claude-fable-5-1", "max")],
+                         costs: ["claude-opus-5-5": 12.4, "claude-fable-5-1": 3.15, "claude-haiku-5-5": 0.04],
+                         extra: [#"{"type":"system","subtype":"away_summary","content":"Moved session loading off the main thread and added tests. Next, check the window on a real Mac. (disable recaps in /config)"}"#,
+                                 #"{"type":"file-history-delta","trackingPath":"Sources/ProfileUI/AppModel.swift"}"#,
+                                 #"{"type":"file-history-delta","trackingPath":"Tests/ProfileUITests/AppFlowTests.swift"}"#,
+                                 #"{"type":"pr-link","prUrl":"https://github.com/me/my-app/pull/12"}"#])
+        await h.model.refresh()
+        h.model.selectSession(hid)
+        await h.settle()
+        save(SessionDetailView(model: h.model, scrolls: false).frame(width: 300), "session-detail", in: dir)
         h.model.route = .add
         save(MenuPanelView(model: h.model, openWindow: {}), "add", in: dir)
         h.model.route = .stop(sessionId: "running")

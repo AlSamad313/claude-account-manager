@@ -12,6 +12,12 @@ public struct SessionRow: Equatable, Sendable {
     public var pid: Int32?
     public var procStart: Date?
     public var mayBeStale: Bool
+    /// The model and effort of the newest reply read, if any.
+    public var setting: ModelSetting? = nil
+    /// API-equivalent cost, as Claude Code last saved it.
+    public var cost: SessionCost? = nil
+    /// Claude Code's newest recap of the session, if it wrote one.
+    public var recap: String? = nil
 }
 
 public struct SessionIndexResult: Equatable, Sendable {
@@ -60,13 +66,19 @@ public final class SessionIndex {
     }
 
     public func ownerOf(sessionId: String, in profiles: [Profile]) -> Profile? {
-        let fm = FileManager.default
         for p in profiles {
-            let root = locator.configDir(for: p).appendingPathComponent("projects")
-            for project in (try? fm.contentsOfDirectory(atPath: root.path)) ?? [] {
-                if fm.fileExists(atPath: root.appendingPathComponent(project).appendingPathComponent(sessionId + ".jsonl").path) { return p }
-            }
+            if transcriptURL(sessionId: sessionId, profile: p) != nil { return p }
             if live.liveRecords(for: p).contains(where: { $0.sessionId == sessionId }) { return p }
+        }
+        return nil
+    }
+
+    public func transcriptURL(sessionId: String, profile p: Profile) -> URL? {
+        let fm = FileManager.default
+        let root = locator.configDir(for: p).appendingPathComponent("projects")
+        for project in (try? fm.contentsOfDirectory(atPath: root.path)) ?? [] {
+            let url = root.appendingPathComponent(project).appendingPathComponent(sessionId + ".jsonl")
+            if fm.fileExists(atPath: url.path) { return url }
         }
         return nil
     }
@@ -82,7 +94,7 @@ public final class SessionIndex {
         return SessionRow(profileId: p.id, sessionId: id, cwd: r?.cwd ?? t?.cwd, title: name ?? t?.title ?? "Untitled",
                           lastActivity: t?.lastActivity ?? Date(), live: r != nil, status: r?.status,
                           entrypoint: r?.entrypoint ?? t?.entrypoint, pid: r?.pid, procStart: r?.procStart,
-                          mayBeStale: r != nil && r?.procStart == nil)
+                          mayBeStale: r != nil && r?.procStart == nil, setting: t?.setting, cost: t?.cost, recap: t?.recap)
     }
 
     private func transcripts(of p: Profile) -> ([TranscriptSummary], Int) {
