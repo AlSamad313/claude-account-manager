@@ -13,7 +13,9 @@ session in one place. It comes as a menu-bar app, a `cpm` command, and a small s
 - **Keeps accounts separate.** Each profile has its own Claude Code config folder, login, settings and history.
 - **Follows a default.** Plain `claude` uses the default profile, and the menu-bar icon shows its colour.
 - **Starts sessions anywhere.** New Terminal asks for a folder, then opens Terminal.app on that account.
-- **Shows every session.** Running and recent sessions across profiles, including ones you started by hand. You can filter, resume and stop them.
+- **Shows every session.** Running and recent sessions across profiles, including ones you started by hand. You can filter, resume and stop them. On macOS, the window
+  also shows a short summary of what each session worked on, its model and effort level, every switch made during it, and its
+  API-equivalent cost per model.
 - **Copies setup between profiles.** MCP servers, skills, plugins and settings, with a preview, hidden secrets and Restore.
 - **Opens VS Code on a profile.**
 

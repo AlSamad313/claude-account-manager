@@ -65,6 +65,13 @@ public final class AppModel {
     public var route: Route = .main
     public var filter = ""
     public var sidebarSelection: String = "all"
+    /// The session picked in the window's table, and the models it used.
+    public private(set) var selectedSessionId: String?
+    public private(set) var history: [ModelSpan]?
+    public private(set) var sessionCost: SessionCost?
+    /// The selected session's recap, changed files and pull requests, from a full read.
+    public private(set) var sessionDetails: ModelHistory?
+    private var historyReader: (sessionId: String, reader: ModelHistory)?
     public var noticeText: String?
     public var errorText: String?
     public private(set) var profiles: [Profile] = []
@@ -196,7 +203,38 @@ public final class AppModel {
             rows = r.rows
             parseFailures = r.parseFailures
         }
+        if selectedRow?.live == true { await loadHistory() }
         if case .waiting(let id) = route { await pollLogin(profileId: id) }
+    }
+
+    // MARK: Model history
+
+    public var selectedRow: SessionRow? { rows.first { $0.sessionId == selectedSessionId } }
+
+    public func selectSession(_ id: String?) {
+        guard id != selectedSessionId else { return }
+        selectedSessionId = id
+        history = nil
+        sessionCost = nil
+        sessionDetails = nil
+        historyReader = nil
+        if id != nil { lastAction = Task { await loadHistory() } }
+    }
+
+    /// The first read covers the whole transcript; later ones read only what was added.
+    public func loadHistory() async {
+        guard let row = selectedRow, let owner = profile(id: row.profileId) else { return }
+        let env = env
+        var reader = historyReader?.sessionId == row.sessionId ? historyReader!.reader : ModelHistory()
+        let result = await onQueue { () -> ModelHistory in
+            if let url = env.index.transcriptURL(sessionId: row.sessionId, profile: owner) { reader.update(url) }
+            return reader
+        }
+        guard selectedSessionId == row.sessionId, case .success(let updated) = result else { return }
+        historyReader = (row.sessionId, updated)
+        if history != updated.spans { history = updated.spans }
+        if sessionCost != updated.cost { sessionCost = updated.cost }
+        sessionDetails = updated
     }
 
     // MARK: Visibility

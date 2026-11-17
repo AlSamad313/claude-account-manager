@@ -95,7 +95,9 @@ Every change must keep these. Many have tests, and a pull request that breaks on
 These aren't public APIs, and they may change:
 
 - `sessions/<pid>.json`: pid, start time, session ID, folder, status, entry point
-- `projects/*/*.jsonl`: transcripts, including the title lines
+- `projects/*/*.jsonl`: transcripts, including the title lines, and each reply's `message.model`, `perTurnEffort`
+  (or `effort` in older files), `message.id`, `isSidechain` and `timestamp`, and `cost-state` lines with `modelUsage.*.costUSD`,
+  `totalCostUSD` and `hasUnknownModelCost`, `away_summary` recaps, `file-history-delta` paths and `pr-link` URLs
 - `.claude.json`: account details and `mcpServers`
 - The Keychain naming rule, and the commands `claude auth`, `claude mcp` and `claude plugin`
 
