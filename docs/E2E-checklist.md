@@ -285,6 +285,10 @@ This is the step most likely to feel broken, so watch it closely.
 - [ ] **7.7 Settings.** "⋯", Settings… on Work. Change the name to `Work2` and the colour, then Done. **Expect:** the row and dot update, and the command stays `work`. A new `claude-as work` shows `● Work2`.
       Change it back. On `main`, **Expect:** no Remove button, and a note that it is your existing `~/.claude`.
 - [ ] **7.8 The window.** Open window…. **Expect:** a sidebar and a table. Selecting a profile filters, and the New Terminal button follows the selection. Right-click a profile: New Terminal, Open VS Code, Make default, Settings….
+- [ ] **7.8b Model and effort.** In the window, check the Model and Effort columns match what you chose in Claude Code. In a running session, type
+      `/model` and pick another model, send a message, then click that session. **Expect:** the pane on the right lists both models, with times,
+      within a few seconds. Do the same with `/effort`.
+      **Expect:** a closed session shows a Cost, and the pane lists it per model. Compare one with what `/cost` showed in that session. The Summary section shows a recap that fits what the session did, and the files it changed. Hovering over a session's title shows the same recap.
 - [ ] **7.9 Panel and window together.** With the window open, press Add profile… in the panel. **Expect:** the same step also appears as a sheet in the window. Decide whether that bothers you, then Cancel.
 - [ ] **7.10 Doctor sheet** from the window lists every profile, and Done closes it.
 - [ ] **7.11 CPU and memory.** Close the panel and window, and wait a minute. Look up `ClaudeProfiles` in Activity Monitor. **Expect:** about 0% CPU. Note its memory, which was about 74 MB at launch with no profiles.

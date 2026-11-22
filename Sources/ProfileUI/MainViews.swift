@@ -147,8 +147,8 @@ public struct MainWindowView: View {
                     }
                     .padding(8).background(Color.orange.opacity(0.15))
                 }
-                Table(model.filteredRows, selection: .constant(nil as String?)) {
-                    TableColumn("Session") { Text($0.title).lineLimit(1) }
+                Table(model.filteredRows, selection: Binding(get: { model.selectedSessionId }, set: { model.selectSession($0) })) {
+                    TableColumn("Session") { Text($0.title).lineLimit(1).help($0.recap ?? "") }
                     TableColumn("Folder") { Text($0.cwd ?? "unknown").foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle) }
                     TableColumn("Profile") { r in
                         HStack(spacing: 6) {
@@ -156,6 +156,15 @@ public struct MainWindowView: View {
                             Text(model.profile(id: r.profileId)?.displayName ?? "Unknown").lineLimit(1)
                         }
                     }.width(min: 90, ideal: 120)
+                    TableColumn("Model") { r in
+                        Text(r.setting.map { ModelNames.model($0.model) } ?? "–").foregroundStyle(.secondary).lineLimit(1)
+                    }.width(min: 70, ideal: 90)
+                    TableColumn("Effort") { r in
+                        Text(r.setting?.effort.map(ModelNames.effort) ?? "–").foregroundStyle(.secondary).lineLimit(1)
+                    }.width(min: 60, ideal: 75)
+                    TableColumn("Cost") { r in
+                        Text(r.cost.map { SessionCost.format($0.totalUSD) } ?? "–").foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
+                    }.width(min: 60, ideal: 70)
                     TableColumn("Status") { r in
                         if r.live {
                             Text(r.status.map { "Running, \($0)" } ?? "Running").fontWeight(.semibold).foregroundStyle(.green)
@@ -169,6 +178,9 @@ public struct MainWindowView: View {
                 Text("\(model.filteredRows.count) sessions. Running ones are rechecked every 2 seconds while this window is open.\(model.parseFailures > 0 ? " \(model.parseFailures) transcripts could not be read." : "")")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).padding(.vertical, 8)
+            }
+            .inspector(isPresented: Binding(get: { model.selectedSessionId != nil }, set: { if !$0 { model.selectSession(nil) } })) {
+                SessionDetailView(model: model).inspectorColumnWidth(min: 240, ideal: 280, max: 380)
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {

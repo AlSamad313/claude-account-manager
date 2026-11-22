@@ -2,6 +2,16 @@
 
 Newest first.
 
+## Unreleased
+
+### Added
+
+- macOS: the window's session list shows each session's model and effort level. Selecting a session opens a pane with every model or
+  effort switch made in it, with times and reply counts. Read from the transcript, so nothing extra is recorded.
+- macOS: a summary of what each session worked on, in the pane and as a tooltip on its title: Claude Code's own recap, the files it changed
+  and any pull requests.
+- macOS: the API-equivalent cost of each session, in the list and per model in the pane, as Claude Code calculates it, including subagents' models.
+
 ## 0.1.0 (2026-11-13)
 
 ### Added
